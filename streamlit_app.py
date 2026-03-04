@@ -50,27 +50,40 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE (PANCERNA INICJALIZACJA) ---
+# --- POŁĄCZENIE (POPRAWIONA STRUKTURA DANYCH) ---
 try:
     if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-        # Tworzymy kopię roboczą danych z Secrets
-        full_conf = dict(st.secrets.connections.gsheets)
+        # Pobieramy surowe dane z Secrets
+        raw_creds = dict(st.secrets.connections.gsheets)
         
-        # 1. Wyciągamy URL arkusza (będzie potrzebny w read/update, nie w st.connection)
-        SHEET_URL = full_conf.get("spreadsheet")
+        # Wyciągamy URL arkusza (on nie wchodzi do obiektu auth)
+        SHEET_URL = raw_creds.get("spreadsheet")
         
-        # 2. Naprawiamy klucz prywatny (zamiana tekstowego \n na znak nowej linii)
-        if "private_key" in full_conf:
-            full_conf["private_key"] = full_conf["private_key"].replace("\\n", "\n")
+        # Naprawiamy klucz prywatny
+        if "private_key" in raw_creds:
+            raw_creds["private_key"] = raw_creds["private_key"].replace("\\n", "\n")
         
-        # 3. Usuwamy klucze, które GSheetsConnection._connect() odrzuca jako 'unexpected'
-        # Biblioteka sama zbuduje z nich obiekt credentials, jeśli przekażesz je poprawnie
-        cleaned_conf = {k: v for k, v in full_conf.items() if k not in ["spreadsheet", "type", "project_id"]}
+        # BUDOWANIE STRUKTURY DLA GOOGLE:
+        # Biblioteka oczekuje, że dane z JSON-a będą wewnątrz 'service_account_info'
+        connection_kwargs = {
+            "service_account_info": {
+                "type": "service_account",
+                "project_id": raw_creds.get("project_id"),
+                "private_key_id": raw_creds.get("private_key_id"),
+                "private_key": raw_creds.get("private_key"),
+                "client_email": raw_creds.get("client_email"),
+                "client_id": raw_creds.get("client_id"),
+                "auth_uri": raw_creds.get("auth_uri"),
+                "token_uri": raw_creds.get("token_uri"),
+                "auth_provider_x509_cert_url": raw_creds.get("auth_provider_x509_cert_url"),
+                "client_x509_cert_url": raw_creds.get("client_x509_cert_url"),
+            }
+        }
         
         # Inicjalizacja połączenia
-        conn = st.connection("gsheets", type=GSheetsConnection, **cleaned_conf)
+        conn = st.connection("gsheets", type=GSheetsConnection, **connection_kwargs)
     else:
-        st.error("Błąd: Nie znaleziono [connections.gsheets] w Secrets!")
+        st.error("Błąd: Brak sekcji [connections.gsheets] w Secrets!")
         st.stop()
 except Exception as e:
     st.error(f"Błąd inicjalizacji: {e}")
@@ -78,43 +91,41 @@ except Exception as e:
 
 def fetch_data(sheet_name):
     try:
-        # Używamy pobranego SHEET_URL przy każdym zapytaniu
         return conn.read(spreadsheet=SHEET_URL, worksheet=sheet_name, ttl=0)
     except Exception as e:
-        st.warning(f"Brak dostępu do zakładki '{sheet_name}'. Sprawdź nazwy w Google Sheets.")
+        st.warning(f"Błąd odczytu '{sheet_name}': {e}")
         return pd.DataFrame()
 
 # --- NAWIGACJA ---
 with st.sidebar:
-    st.markdown("# 💄 Menu Retro")
+    st.markdown("# 💄 Menu")
     st.image("https://www.freeiconspng.com/uploads/retro-pin-up-girl-png-10.png", width=150)
-    choice = st.radio("Sekcja:", ["Salon (Podsumowanie)", "Dodaj Wydatek", "Dodaj Przychód", "Zobowiązania", "Lista Zakupów"])
+    choice = st.radio("Sekcja:", ["Podsumowanie", "Wydatki", "Przychody", "Zobowiązania", "Lista Zakupów"])
 
 # --- WIDOKI ---
 
-if choice == "Salon (Podsumowanie)":
+if choice == "Podsumowanie":
     st.title("👗 Twój Budżetowy Salon")
     
     df_wyd = fetch_data("Wydatki")
     df_prz = fetch_data("Przychody")
     df_osz = fetch_data("Oszczednosci")
     
-    # Przeliczanie sum
     total_in = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
     total_out = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
     total_savings = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Wpływy", f"{total_in:,.2f} zł")
-    col2.metric("Wydatki", f"{total_out:,.2f} zł")
-    col3.metric("Oszczędności", f"{total_savings:,.2f} zł")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Wpływy", f"{total_in:,.2f} zł")
+    c2.metric("Wydatki", f"{total_out:,.2f} zł")
+    c3.metric("Oszczędności", f"{total_savings:,.2f} zł")
 
     st.markdown("### 📸 Ostatnie wpisy")
     if not df_wyd.empty:
-        st.dataframe(df_wyd.tail(10).iloc[::-1], use_container_width=True)
+        st.dataframe(df_wyd.tail(10), use_container_width=True)
 
-elif choice == "Dodaj Wydatek":
-    st.title("🛍️ Nowy Paragon")
+elif choice == "Wydatki":
+    st.title("🛍️ Dodaj Wydatek")
     with st.form("exp_form", clear_on_submit=True):
         nazwa = st.text_input("Co kupiłaś?")
         kwota = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
@@ -132,10 +143,10 @@ elif choice == "Dodaj Wydatek":
             existing = fetch_data("Wydatki")
             updated = pd.concat([existing, new_row], ignore_index=True)
             conn.update(spreadsheet=SHEET_URL, worksheet="Wydatki", data=updated)
-            st.success("Zapisano! Budżet pod kontrolą! ✨")
+            st.success("Zapisano! ✨")
 
-elif choice == "Dodaj Przychód":
-    st.title("💵 Nowe Wpływy")
+elif choice == "Przychody":
+    st.title("💵 Dodaj Przychód")
     with st.form("inc_form", clear_on_submit=True):
         nazwa_p = st.text_input("Źródło")
         kwota_p = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
@@ -149,10 +160,10 @@ elif choice == "Dodaj Przychód":
             existing_p = fetch_data("Przychody")
             updated_p = pd.concat([existing_p, new_row_p], ignore_index=True)
             conn.update(spreadsheet=SHEET_URL, worksheet="Przychody", data=updated_p)
-            st.success("Pieniądze dodane! 🍒")
+            st.success("Wpływy zapisane! 🍒")
 
 elif choice == "Zobowiązania":
-    st.title("📅 Twoje Raty i Koszty")
+    st.title("📅 Raty i Koszty")
     st.markdown("### 💎 Raty")
     st.dataframe(fetch_data("Raty"), use_container_width=True)
     st.markdown("### 🏠 Koszty Stałe")
@@ -161,14 +172,12 @@ elif choice == "Zobowiązania":
 elif choice == "Lista Zakupów":
     st.title("📝 Lista zakupów")
     df_zak = fetch_data("Zakupy")
-    
     new_prod = st.text_input("Co dopisać?")
-    if st.button("DODAJ DO LISTY"):
-        if new_prod:
-            new_row_z = pd.DataFrame([{"Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Produkt": new_prod}])
-            updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
-            conn.update(spreadsheet=SHEET_URL, worksheet="Zakupy", data=updated_z)
-            st.rerun()
+    if st.button("DODAJ"):
+        new_row_z = pd.DataFrame([{"Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Produkt": new_prod}])
+        updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
+        conn.update(spreadsheet=SHEET_URL, worksheet="Zakupy", data=updated_z)
+        st.rerun()
     
     st.markdown("---")
     if not df_zak.empty:
