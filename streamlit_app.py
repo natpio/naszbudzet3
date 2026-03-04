@@ -3,7 +3,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
-import io
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Retro Budżet Domowy", page_icon="💄", layout="centered")
@@ -23,32 +22,21 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNKCJA NAPRAWCZA DLA KLUCZA (ULTRA AGRESYWNA) ---
-def fix_pem_format(key_string):
-    if not key_string:
-        return None
-    
-    # 1. Usuwamy znaki spoza zakresu ASCII (to one powodują błąd InvalidByte)
-    clean_ascii = "".join(char for char in key_string if ord(char) < 128)
-    
-    # 2. Standaryzujemy znaki nowej linii
-    clean_lines = clean_ascii.replace("\\n", "\n").splitlines()
-    
-    # 3. Czyścimy każdą linię z białych znaków i odrzucamy puste
-    processed_lines = [line.strip() for line in clean_lines if line.strip()]
-    
-    # 4. Składamy w czysty format PEM
-    return "\n".join(processed_lines)
-
-# --- POŁĄCZENIE Z GOOGLE ---
+# --- PANCERNE POŁĄCZENIE ---
 @st.cache_resource
 def connect_to_gsheets():
     try:
+        # Pobieramy dane jako słownik bezpośrednio z obiektu Secrets
         s = st.secrets["connections"]["gsheets"]
         
-        # Naprawa klucza przed wysłaniem do Google
-        final_key = fix_pem_format(s["private_key"])
+        # Ekstrakcja klucza i wymuszenie poprawnego formatowania \n
+        # To naprawia błąd InvalidByte(64, 91)
+        raw_key = s["private_key"]
+        clean_key = raw_key.replace("\\n", "\n")
         
+        # Jeśli klucz został wklejony z cudzysłowami na końcach, usuwamy je
+        clean_key = clean_key.strip('"').strip("'")
+
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
@@ -58,7 +46,7 @@ def connect_to_gsheets():
             "type": "service_account",
             "project_id": s["project_id"],
             "private_key_id": s["private_key_id"],
-            "private_key": final_key,
+            "private_key": clean_key,
             "client_email": s["client_email"],
             "client_id": s["client_id"],
             "auth_uri": s["auth_uri"],
@@ -95,17 +83,15 @@ if view == "Podsumowanie":
     df_prz = load_data("Przychody")
     df_osz = load_data("Oszczednosci")
     
-    # Prosta analityka
     in_sum = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
     out_sum = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
     save_sum = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Wpływy", f"{in_sum:,.2f} zł")
-    col2.metric("Wydatki", f"{out_sum:,.2f} zł")
-    col3.metric("Skarbonka", f"{save_sum:,.2f} zł")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Wpływy", f"{in_sum:,.2f} zł")
+    c2.metric("Wydatki", f"{out_sum:,.2f} zł")
+    c3.metric("Skarbonka", f"{save_sum:,.2f} zł")
     
-    st.markdown("### Ostatnie operacje")
     st.dataframe(df_wyd.tail(10), use_container_width=True)
 
 elif view == "Wydatki":
@@ -127,18 +113,17 @@ elif view == "Przychody":
         if st.form_submit_button("ZAPISZ"):
             if sh:
                 sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), source, amount])
-                st.success("Dodano do budżetu! 🍒")
+                st.success("Dodano! 🍒")
 
 elif view == "Raty":
     st.title("📅 Raty i Opłaty")
     st.dataframe(load_data("Raty"), use_container_width=True)
-    st.dataframe(load_data("Koszty_Stale"), use_container_width=True)
 
 elif view == "Zakupy":
     st.title("📝 Lista Zakupów")
     df_zak = load_data("Zakupy")
     new_item = st.text_input("Co kupić?")
-    if st.button("DODAJ DO LISTY"):
+    if st.button("DODAJ"):
         if sh and new_item:
             sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_item])
             st.rerun()
