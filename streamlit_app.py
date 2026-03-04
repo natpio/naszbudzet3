@@ -2,23 +2,22 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
+import json
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Retro Domowy Budżet", page_icon="💄", layout="centered")
 
-# --- STYLIZACJA RETRO PIN-UP (CSS) ---
+# --- STYLIZACJA RETRO PIN-UP ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Special+Elite&family=Roboto:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Special+Elite&display=swap');
 
-    /* Tło - klasyczne różowe kropki retro */
     .stApp {
         background-color: #fce4ec;
         background-image: radial-gradient(#f06292 2px, transparent 2px);
-        background-size: 40px 40px;
+        background-size: 35px 35px;
     }
 
-    /* Nagłówki */
     h1, h2, h3 {
         font-family: 'Pacifico', cursive !important;
         color: #d81b60 !important;
@@ -26,80 +25,65 @@ st.markdown("""
         text-align: center;
     }
 
-    /* Pasek boczny */
+    div.stButton > button {
+        background-color: #d81b60 !important;
+        color: white !important;
+        border-radius: 25px !important;
+        border: 3px solid #880e4f !important;
+        font-family: 'Special Elite', cursive;
+        font-size: 1.2rem;
+        width: 100%;
+        box-shadow: 4px 4px 0px #880e4f;
+    }
+
     [data-testid="stSidebar"] {
         background-color: #f8bbd0 !important;
         border-right: 5px solid #d81b60;
     }
 
-    /* Przyciski w stylu lat 60. */
-    div.stButton > button {
-        background-color: #d81b60 !important;
-        color: white !important;
-        font-family: 'Special Elite', cursive !important;
-        font-size: 1.2rem !important;
-        border-radius: 30px !important;
-        border: 3px solid #880e4f !important;
-        box-shadow: 4px 4px 0px #880e4f;
-        width: 100%;
-        height: 3em;
-        transition: 0.3s;
-    }
-
-    div.stButton > button:hover {
-        background-color: #ad1457 !important;
-        transform: translateY(-2px);
-    }
-
-    /* Karty z danymi (Metric) */
-    [data-testid="stMetricValue"] {
-        font-family: 'Special Elite', cursive !important;
-        color: #c2185b !important;
-    }
-
     .stMetric {
         background-color: white;
-        padding: 20px;
-        border-radius: 20px;
+        padding: 15px;
+        border-radius: 15px;
         border: 2px solid #d81b60;
-        box-shadow: 6px 6px 0px #f06292;
-    }
-
-    /* Styl tabel */
-    .stDataFrame {
-        background-color: white;
-        border-radius: 10px;
-        border: 2px solid #d81b60;
+        box-shadow: 5px 5px 0px #f06292;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE Z ARKUSZEM ---
+# --- MECHANIZM NAPRAWCZY DLA KLUCZA GOOGLE ---
+# Pobieramy sekrety i ręcznie naprawiamy formatowanie klucza prywatnego
+if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+    gsheets_secrets = dict(st.secrets.connections.gsheets)
+    # Kluczowa poprawka: zamiana tekstowego "\n" na prawdziwy znak nowej linii
+    if "private_key" in gsheets_secrets:
+        gsheets_secrets["private_key"] = gsheets_secrets["private_key"].replace("\\n", "\n")
+else:
+    st.error("Brak konfiguracji secrets w panelu Streamlit!")
+    st.stop()
+
+# --- POŁĄCZENIE ---
+# Przekazujemy naprawione sekrety bezpośrednio do połączenia
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    conn = st.connection("gsheets", type=GSheetsConnection, **gsheets_secrets)
 except Exception as e:
-    st.error("Problem z połączeniem. Sprawdź formatowanie klucza w Secrets.")
+    st.error(f"Błąd inicjalizacji połączenia: {e}")
     st.stop()
 
 def fetch_data(sheet_name):
     try:
-        # ttl=0 wyłącza cache, by widzieć zmiany natychmiast po zapisie
         return conn.read(worksheet=sheet_name, ttl=0)
     except Exception as e:
-        st.warning(f"Nie znaleziono arkusza: {sheet_name}. Upewnij się, że nazwa zakładki w Google Sheets jest identyczna.")
+        st.warning(f"Nie można odczytać arkusza: {sheet_name}. Błąd: {e}")
         return pd.DataFrame()
 
-# --- PANEL BOCZNY (NAWIGACJA) ---
+# --- NAWIGACJA ---
 with st.sidebar:
-    st.markdown("# 💄 Menu")
-    st.image("https://www.freeiconspng.com/uploads/retro-pin-up-girl-png-10.png", width=180)
-    st.markdown("---")
-    choice = st.radio("Dokąd idziemy, kochanie?", 
-                      ["Salon (Podsumowanie)", "Wprowadź Wydatek", "Wprowadź Przychód", "Raty & Koszty Stałe", "Lista Zakupów"])
-    st.markdown("---")
-    st.write("✨ Prywatny Budżet Retro")
+    st.markdown("# 💄 Menu Retro")
+    st.image("https://www.freeiconspng.com/uploads/retro-pin-up-girl-png-10.png", width=150)
+    choice = st.radio("Sekcja:", ["Salon (Podsumowanie)", "Wydatki", "Przychody", "Raty & Koszty Stałe", "Lista Zakupów"])
 
-# --- LOGIKA PANELI ---
+# --- WIDOKI ---
 
 if choice == "Salon (Podsumowanie)":
     st.title("👗 Twój Budżetowy Salon")
@@ -107,35 +91,30 @@ if choice == "Salon (Podsumowanie)":
     df_wyd = fetch_data("Wydatki")
     df_prz = fetch_data("Przychody")
     df_osz = fetch_data("Oszczednosci")
-
-    # Obliczenia z konwersją na liczby
+    
+    # Przeliczanie kwot (zamiana na float dla bezpieczeństwa)
     total_in = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
     total_out = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
     total_savings = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Wpływy", f"{total_in:,.2f} zł")
-    c2.metric("Wydatki", f"{total_out:,.2f} zł")
-    c3.metric("Oszczędności", f"{total_savings:,.2f} zł")
 
-    st.markdown("### 📸 Ostatnie Wydatki")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Wpływy", f"{total_in:,.2f} zł")
+    col2.metric("Wydatki", f"{total_out:,.2f} zł")
+    col3.metric("Oszczędności", f"{total_savings:,.2f} zł")
+
+    st.markdown("### 📸 Ostatnie wpisy (Wydatki)")
     if not df_wyd.empty:
-        st.dataframe(df_wyd.tail(8).sort_values(by="Data i Godzina", ascending=False), use_container_width=True)
-    else:
-        st.info("Brak wpisów w arkuszu 'Wydatki'.")
+        st.dataframe(df_wyd.tail(10), use_container_width=True)
 
-elif choice == "Wprowadź Wydatek":
-    st.title("🛍️ Nowy Paragon")
+elif choice == "Wydatki":
+    st.title("🛍️ Dodaj Wydatek")
     with st.form("exp_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            nazwa = st.text_input("Co kupiono?")
-            kwota = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
-        with col2:
-            kat = st.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
-            typ = st.selectbox("Typ", ["Zmienny", "Stały"])
+        nazwa = st.text_input("Nazwa zakupu")
+        kwota = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
+        kat = st.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
+        typ = st.selectbox("Typ", ["Zmienny", "Stały"])
         
-        if st.form_submit_button("ZAPISZ W DZIENNIKU"):
+        if st.form_submit_button("ZAPISZ"):
             new_row = pd.DataFrame([{
                 "Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Nazwa": nazwa,
@@ -146,15 +125,15 @@ elif choice == "Wprowadź Wydatek":
             existing = fetch_data("Wydatki")
             updated = pd.concat([existing, new_row], ignore_index=True)
             conn.update(worksheet="Wydatki", data=updated)
-            st.success("Zapisano! Jesteś bardzo rozsądna! ✨")
+            st.success("Zapisano! Dbasz o dom jak nikt inny! ✨")
 
-elif choice == "Wprowadź Przychód":
-    st.title("💵 Nowe Wpływy")
+elif choice == "Przychody":
+    st.title("💵 Dodaj Przychód")
     with st.form("inc_form", clear_on_submit=True):
-        nazwa_p = st.text_input("Źródło przychodu")
+        nazwa_p = st.text_input("Źródło")
         kwota_p = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
         
-        if st.form_submit_button("DODAJ DO BUDŻETU"):
+        if st.form_submit_button("DODAJ"):
             new_row_p = pd.DataFrame([{
                 "Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Nazwa": nazwa_p,
@@ -163,36 +142,27 @@ elif choice == "Wprowadź Przychód":
             existing_p = fetch_data("Przychody")
             updated_p = pd.concat([existing_p, new_row_p], ignore_index=True)
             conn.update(worksheet="Przychody", data=updated_p)
-            st.success("Budżet zasiliły nowe środki! 🍒")
+            st.success("Skarbonka pełna! 🍒")
 
 elif choice == "Raty & Koszty Stałe":
-    st.title("📅 Twoje Zobowiązania")
-    tab1, tab2 = st.tabs(["💎 Raty", "🏠 Koszty Stałe"])
-    
-    with tab1:
-        df_raty = fetch_data("Raty")
-        st.dataframe(df_raty, use_container_width=True)
-        
-    with tab2:
-        df_stale = fetch_data("Koszty_Stale")
-        st.dataframe(df_stale, use_container_width=True)
+    st.title("📅 Zobowiązania")
+    st.markdown("### 💎 Twoje Raty")
+    st.dataframe(fetch_data("Raty"), use_container_width=True)
+    st.markdown("### 🏠 Koszty Stałe")
+    st.dataframe(fetch_data("Koszty_Stale"), use_container_width=True)
 
 elif choice == "Lista Zakupów":
     st.title("📝 Lista zakupów")
     df_zak = fetch_data("Zakupy")
     
-    new_prod = st.text_input("Co dopisać do listy?")
-    if st.button("DODAJ"):
-        if new_prod:
-            new_row_z = pd.DataFrame([{
-                "Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                "Produkt": new_prod
-            }])
-            updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
-            conn.update(worksheet="Zakupy", data=updated_z)
-            st.rerun()
+    new_prod = st.text_input("Dopisz produkt:")
+    if st.button("DODAJ DO LISTY"):
+        new_row_z = pd.DataFrame([{"Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Produkt": new_prod}])
+        updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
+        conn.update(worksheet="Zakupy", data=updated_z)
+        st.rerun()
     
     st.markdown("---")
     if not df_zak.empty:
-        for p in df_zak["Produkt"]:
-            st.write(f"🔘 {p}")
+        for prod in df_zak["Produkt"]:
+            st.write(f"🔘 {prod}")
