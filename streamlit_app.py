@@ -1,5 +1,6 @@
 import streamlit as st
 import gspread
+from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
@@ -45,71 +46,66 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE PRZEZ GSPREAD (OMIJAMY BŁĘDY BIBLIOTEKI STREAMLIT) ---
+# --- POŁĄCZENIE (SYSTEMOWE - GSPREAD) ---
 @st.cache_resource
-def get_gspread_client():
+def get_google_sheet():
     try:
-        # Pobieramy dane bezpośrednio z sekcji gsheets w Secrets
+        # Pobieramy dane z Twojej sekcji [connections.gsheets] w Secrets
         s = st.secrets["connections"]["gsheets"]
         
-        # Tworzymy słownik poświadczeń dokładnie tak, jak chce tego Google
-        creds_dict = {
-            "type": "service_account",
-            "project_id": s["project_id"],
-            "private_key_id": s["private_key_id"],
-            "private_key": s["private_key"].replace("\\n", "\n"),
-            "client_email": s["client_email"],
-            "client_id": s["client_id"],
-            "auth_uri": s["auth_uri"],
-            "token_uri": s["token_uri"],
-            "auth_provider_x509_cert_url": s["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": s["client_x509_cert_url"]
-        }
+        # Definiujemy zakresy uprawnień
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
         
-        # Logowanie do Google
-        gc = gspread.service_account_from_dict(creds_dict)
-        # Otwieranie arkusza po jego ID lub URL (wyciągamy z Secrets)
-        sh = gc.open_by_url(s["spreadsheet"])
-        return sh
+        # Budujemy poświadczenia dokładnie tak, jak wymaga tego Google
+        credentials = Credentials.from_service_account_info(
+            {
+                "type": "service_account",
+                "project_id": s["project_id"],
+                "private_key_id": s["private_key_id"],
+                "private_key": s["private_key"].replace("\\n", "\n"),
+                "client_email": s["client_email"],
+                "client_id": s["client_id"],
+                "auth_uri": s["auth_uri"],
+                "token_uri": s["token_uri"],
+                "auth_provider_x509_cert_url": s["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": s["client_x509_cert_url"],
+            },
+            scopes=scopes
+        )
+        
+        # Autoryzacja i otwarcie arkusza
+        gc = gspread.authorize(credentials)
+        return gc.open_by_url(s["spreadsheet"])
     except Exception as e:
-        st.error(f"Błąd autoryzacji Google: {e}")
+        st.error(f"Krytyczny błąd połączenia: {e}")
         return None
 
 # Inicjalizacja arkusza
-sh = get_gspread_client()
+sh = get_google_sheet()
 
 def fetch_data(sheet_name):
     if sh:
         try:
             worksheet = sh.worksheet(sheet_name)
-            data = worksheet.get_all_records()
-            return pd.DataFrame(data)
+            return pd.DataFrame(worksheet.get_all_records())
         except Exception as e:
-            st.warning(f"Brak arkusza '{sheet_name}'. Utwórz go w Google Sheets.")
+            st.warning(f"Arkusz '{sheet_name}' nie został znaleziony.")
             return pd.DataFrame()
     return pd.DataFrame()
 
-def append_data(sheet_name, row_list):
-    if sh:
-        try:
-            worksheet = sh.worksheet(sheet_name)
-            worksheet.append_row(row_list)
-            return True
-        except Exception as e:
-            st.error(f"Błąd zapisu: {e}")
-            return False
-    return False
-
 # --- NAWIGACJA ---
 with st.sidebar:
-    st.markdown("# 💄 Menu Retro")
+    st.markdown("# 💄 Menu")
     st.image("https://www.freeiconspng.com/uploads/retro-pin-up-girl-png-10.png", width=150)
     choice = st.radio("Sekcja:", ["Salon", "Wydatki", "Przychody", "Zobowiązania", "Lista Zakupów"])
 
-# --- LOGIKA WIDOKÓW ---
+# --- WIDOKI ---
 
 if choice == "Salon":
-    st.title("👗 Twój Budżetowy Salon")
+    st.title("👗 Salon")
     
     df_wyd = fetch_data("Wydatki")
     df_prz = fetch_data("Przychody")
@@ -124,38 +120,41 @@ if choice == "Salon":
     c2.metric("Wydatki", f"{t_out:,.2f} zł")
     c3.metric("Oszczędności", f"{t_save:,.2f} zł")
 
-    st.markdown("### 📸 Ostatnie Wydatki")
+    st.markdown("### Ostatnie wpisy")
     st.dataframe(df_wyd.tail(10), use_container_width=True)
 
 elif choice == "Wydatki":
     st.title("🛍️ Dodaj Wydatek")
     with st.form("exp_form", clear_on_submit=True):
-        nazwa = st.text_input("Nazwa zakupu")
+        nazwa = st.text_input("Co kupiłaś?")
         kwota = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
         kat = st.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
         typ = st.selectbox("Typ", ["Zmienny", "Stały"])
         
         if st.form_submit_button("ZAPISZ"):
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if append_data("Wydatki", [timestamp, nazwa, kwota, kat, typ]):
-                st.success("Zapisano pomyślnie! ✨")
+            if sh:
+                try:
+                    wks = sh.worksheet("Wydatki")
+                    wks.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), nazwa, kwota, kat, typ])
+                    st.success("Zapisano! ✨")
+                except Exception as e:
+                    st.error(f"Błąd zapisu: {e}")
 
 elif choice == "Przychody":
     st.title("💵 Dodaj Przychód")
     with st.form("inc_form", clear_on_submit=True):
         nazwa_p = st.text_input("Źródło")
-        kwota_p = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
-        
+        kwota_p = st.number_input("Kwota", min_value=0.0)
         if st.form_submit_button("DODAJ"):
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if append_data("Przychody", [timestamp, nazwa_p, kwota_p]):
+            if sh:
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), nazwa_p, kwota_p])
                 st.success("Budżet zasiliły nowe środki! 🍒")
 
 elif choice == "Zobowiązania":
-    st.title("📅 Raty i Stałe Koszty")
-    st.markdown("### 💎 Raty")
+    st.title("📅 Raty i Koszty")
+    st.markdown("### Raty")
     st.dataframe(fetch_data("Raty"), use_container_width=True)
-    st.markdown("### 🏠 Koszty Stałe")
+    st.markdown("### Koszty Stałe")
     st.dataframe(fetch_data("Koszty_Stale"), use_container_width=True)
 
 elif choice == "Lista Zakupów":
@@ -163,11 +162,10 @@ elif choice == "Lista Zakupów":
     df_zak = fetch_data("Zakupy")
     new_prod = st.text_input("Co dopisać?")
     if st.button("DODAJ"):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if append_data("Zakupy", [timestamp, new_prod]):
+        if sh and new_prod:
+            sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_prod])
             st.rerun()
     
-    st.markdown("---")
     if not df_zak.empty:
         for p in df_zak["Produkt"]:
             st.write(f"🔘 {p}")
