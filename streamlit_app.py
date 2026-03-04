@@ -3,70 +3,62 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
-import re
+import io
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Retro Domowy Budżet", page_icon="💄", layout="centered")
+st.set_page_config(page_title="Retro Budżet Domowy", page_icon="💄", layout="centered")
 
 # --- STYLIZACJA RETRO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Special+Elite&display=swap');
-    .stApp {
-        background-color: #fce4ec;
-        background-image: radial-gradient(#f06292 2px, transparent 2px);
-        background-size: 35px 35px;
-    }
+    .stApp { background-color: #fce4ec; background-image: radial-gradient(#f06292 2px, transparent 2px); background-size: 35px 35px; }
     h1, h2, h3 { font-family: 'Pacifico', cursive !important; color: #d81b60 !important; text-align: center; }
     div.stButton > button {
-        background-color: #d81b60 !important;
-        color: white !important;
-        border-radius: 25px !important;
-        font-family: 'Special Elite', cursive;
-        width: 100%;
-        box-shadow: 4px 4px 0px #880e4f;
+        background-color: #d81b60 !important; color: white !important;
+        border-radius: 25px !important; font-family: 'Special Elite', cursive;
+        width: 100%; box-shadow: 4px 4px 0px #880e4f;
     }
-    .stMetric {
-        background-color: white;
-        padding: 15px;
-        border-radius: 15px;
-        border: 2px solid #d81b60;
-    }
+    .stMetric { background-color: white; padding: 15px; border-radius: 15px; border: 2px solid #d81b60; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MECHANIZM CZYSZCZENIA KLUCZA (NAPRAWA BŁĘDU PEM) ---
-def sanitize_key(key):
-    if not key:
+# --- FUNKCJA NAPRAWCZA DLA KLUCZA (ULTRA AGRESYWNA) ---
+def fix_pem_format(key_string):
+    if not key_string:
         return None
-    # 1. Usuwamy znaki spoza standardu ASCII (naprawa błędu InvalidByte)
-    key = "".join(i for i in key if ord(i) < 128)
-    # 2. Zamieniamy tekstowe "\n" na prawdziwe entery
-    key = key.replace("\\n", "\n")
-    # 3. Czyścimy białe znaki na końcach linii
-    lines = [line.strip() for line in key.split('\n') if line.strip()]
-    return '\n'.join(lines)
+    
+    # 1. Usuwamy znaki spoza zakresu ASCII (to one powodują błąd InvalidByte)
+    clean_ascii = "".join(char for char in key_string if ord(char) < 128)
+    
+    # 2. Standaryzujemy znaki nowej linii
+    clean_lines = clean_ascii.replace("\\n", "\n").splitlines()
+    
+    # 3. Czyścimy każdą linię z białych znaków i odrzucamy puste
+    processed_lines = [line.strip() for line in clean_lines if line.strip()]
+    
+    # 4. Składamy w czysty format PEM
+    return "\n".join(processed_lines)
 
-# --- POŁĄCZENIE ---
+# --- POŁĄCZENIE Z GOOGLE ---
 @st.cache_resource
-def get_google_sheet():
+def connect_to_gsheets():
     try:
-        # Pobranie danych z TOML Secrets
         s = st.secrets["connections"]["gsheets"]
         
-        # Agresywne czyszczenie klucza przed autoryzacją
-        clean_key = sanitize_key(s["private_key"])
+        # Naprawa klucza przed wysłaniem do Google
+        final_key = fix_pem_format(s["private_key"])
         
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
         
-        creds_dict = {
+        creds_info = {
             "type": "service_account",
             "project_id": s["project_id"],
             "private_key_id": s["private_key_id"],
-            "private_key": clean_key,
+            "private_key": final_key,
             "client_email": s["client_email"],
             "client_id": s["client_id"],
             "auth_uri": s["auth_uri"],
@@ -75,92 +67,80 @@ def get_google_sheet():
             "client_x509_cert_url": s["client_x509_cert_url"],
         }
         
-        credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
         gc = gspread.authorize(credentials)
         return gc.open_by_url(s["spreadsheet"])
     except Exception as e:
-        st.error(f"Problem z kluczem lub połączeniem: {e}")
+        st.error(f"❌ Krytyczny błąd autoryzacji: {e}")
         return None
 
-sh = get_google_sheet()
+sh = connect_to_gsheets()
 
-def fetch_data(sheet_name):
+def load_data(name):
     if sh:
         try:
-            wks = sh.worksheet(sheet_name)
-            return pd.DataFrame(wks.get_all_records())
+            return pd.DataFrame(sh.worksheet(name).get_all_records())
         except:
             return pd.DataFrame()
     return pd.DataFrame()
 
-# --- NAWIGACJA ---
+# --- INTERFEJS ---
 with st.sidebar:
     st.markdown("# 💄 Menu")
-    choice = st.radio("Sekcja:", ["Salon", "Wydatki", "Przychody", "Zobowiązania", "Lista Zakupów"])
+    view = st.radio("Wybierz:", ["Podsumowanie", "Wydatki", "Przychody", "Raty", "Zakupy"])
 
-# --- WIDOKI ---
-if choice == "Salon":
-    st.title("👗 Twój Budżet")
-    df_wyd = fetch_data("Wydatki")
-    df_prz = fetch_data("Przychody")
-    df_osz = fetch_data("Oszczednosci")
+if view == "Podsumowanie":
+    st.title("👗 Salon Budżetowy")
+    df_wyd = load_data("Wydatki")
+    df_prz = load_data("Przychody")
+    df_osz = load_data("Oszczednosci")
     
-    t_in = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
-    t_out = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
-    t_save = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
+    # Prosta analityka
+    in_sum = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
+    out_sum = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
+    save_sum = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Wpływy", f"{t_in:,.2f} zł")
-    c2.metric("Wydatki", f"{t_out:,.2f} zł")
-    c3.metric("Oszczędności", f"{t_save:,.2f} zł")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Wpływy", f"{in_sum:,.2f} zł")
+    col2.metric("Wydatki", f"{out_sum:,.2f} zł")
+    col3.metric("Skarbonka", f"{save_sum:,.2f} zł")
     
-    st.markdown("### 📸 Ostatnie wpisy")
+    st.markdown("### Ostatnie operacje")
     st.dataframe(df_wyd.tail(10), use_container_width=True)
 
-elif choice == "Wydatki":
+elif view == "Wydatki":
     st.title("🛍️ Dodaj Wydatek")
-    with st.form("exp_form", clear_on_submit=True):
-        nazwa = st.text_input("Produkt")
-        kwota = st.number_input("Kwota", min_value=0.0)
-        kat = st.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
-        if st.form_submit_button("ZAPISZ"):
-            if sh:
-                try:
-                    sh.worksheet("Wydatki").append_row([
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                        nazwa, kwota, kat, "Zmienny"
-                    ])
-                    st.success("Zapisano pomyślnie! ✨")
-                except Exception as e:
-                    st.error(f"Błąd zapisu: {e}")
-
-elif choice == "Przychody":
-    st.title("💵 Dodaj Przychód")
-    with st.form("inc_form", clear_on_submit=True):
-        nazwa_p = st.text_input("Źródło")
-        kwota_p = st.number_input("Kwota", min_value=0.0)
+    with st.form("form_exp", clear_on_submit=True):
+        item = st.text_input("Nazwa")
+        price = st.number_input("Kwota", min_value=0.0)
+        cat = st.selectbox("Kat.", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
         if st.form_submit_button("DODAJ"):
             if sh:
-                sh.worksheet("Przychody").append_row([
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                    nazwa_p, kwota_p
-                ])
-                st.success("Wpływy zapisane! 🍒")
+                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), item, price, cat, "Zmienny"])
+                st.success("Zapisano! ✨")
 
-elif choice == "Zobowiązania":
-    st.title("📅 Raty i Koszty")
-    st.subheader("Raty")
-    st.dataframe(fetch_data("Raty"), use_container_width=True)
-    st.subheader("Koszty Stałe")
-    st.dataframe(fetch_data("Koszty_Stale"), use_container_width=True)
+elif view == "Przychody":
+    st.title("💵 Dodaj Przychód")
+    with st.form("form_inc", clear_on_submit=True):
+        source = st.text_input("Źródło")
+        amount = st.number_input("Kwota", min_value=0.0)
+        if st.form_submit_button("ZAPISZ"):
+            if sh:
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), source, amount])
+                st.success("Dodano do budżetu! 🍒")
 
-elif choice == "Lista Zakupów":
-    st.title("📝 Lista zakupów")
-    df_zak = fetch_data("Zakupy")
-    new_prod = st.text_input("Co dopisać?")
-    if st.button("DODAJ"):
-        if sh and new_prod:
-            sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_prod])
+elif view == "Raty":
+    st.title("📅 Raty i Opłaty")
+    st.dataframe(load_data("Raty"), use_container_width=True)
+    st.dataframe(load_data("Koszty_Stale"), use_container_width=True)
+
+elif view == "Zakupy":
+    st.title("📝 Lista Zakupów")
+    df_zak = load_data("Zakupy")
+    new_item = st.text_input("Co kupić?")
+    if st.button("DODAJ DO LISTY"):
+        if sh and new_item:
+            sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_item])
             st.rerun()
     if not df_zak.empty:
         for p in df_zak["Produkt"]:
