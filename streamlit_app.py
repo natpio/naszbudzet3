@@ -50,84 +50,83 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE (POPRAWIONA STRUKTURA DANYCH) ---
+# --- POŁĄCZENIE (METODA ODPORNA NA BŁĘDY ARGUMENTÓW) ---
 try:
     if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-        # Pobieramy surowe dane z Secrets
-        raw_creds = dict(st.secrets.connections.gsheets)
+        # Pobieramy dane z sekcji Secrets
+        s = st.secrets.connections.gsheets
         
-        # Wyciągamy URL arkusza (on nie wchodzi do obiektu auth)
-        SHEET_URL = raw_creds.get("spreadsheet")
+        # Zapamiętujemy URL arkusza
+        SHEET_URL = s.get("spreadsheet")
         
-        # Naprawiamy klucz prywatny
-        if "private_key" in raw_creds:
-            raw_creds["private_key"] = raw_creds["private_key"].replace("\\n", "\n")
-        
-        # BUDOWANIE STRUKTURY DLA GOOGLE:
-        # Biblioteka oczekuje, że dane z JSON-a będą wewnątrz 'service_account_info'
-        connection_kwargs = {
-            "service_account_info": {
-                "type": "service_account",
-                "project_id": raw_creds.get("project_id"),
-                "private_key_id": raw_creds.get("private_key_id"),
-                "private_key": raw_creds.get("private_key"),
-                "client_email": raw_creds.get("client_email"),
-                "client_id": raw_creds.get("client_id"),
-                "auth_uri": raw_creds.get("auth_uri"),
-                "token_uri": raw_creds.get("token_uri"),
-                "auth_provider_x509_cert_url": raw_creds.get("auth_provider_x509_cert_url"),
-                "client_x509_cert_url": raw_creds.get("client_x509_cert_url"),
-            }
+        # Budujemy słownik credentials ręcznie, używając tylko standardowych kluczy Google
+        # To zapobiega błędom 'unexpected keyword argument'
+        google_info = {
+            "type": "service_account",
+            "project_id": s.get("project_id"),
+            "private_key_id": s.get("private_key_id"),
+            "private_key": s.get("private_key").replace("\\n", "\n") if s.get("private_key") else None,
+            "client_email": s.get("client_email"),
+            "client_id": s.get("client_id"),
+            "auth_uri": s.get("auth_uri"),
+            "token_uri": s.get("token_uri"),
+            "auth_provider_x509_cert_url": s.get("auth_provider_x509_cert_url"),
+            "client_x509_cert_url": s.get("client_x509_cert_url"),
         }
         
-        # Inicjalizacja połączenia
-        conn = st.connection("gsheets", type=GSheetsConnection, **connection_kwargs)
+        # Kluczowe: Przekazujemy TOML jako service_account_info, 
+        # a st.connection wywołujemy BEZ dodatkowych parametrów rozpakowanych (**conf)
+        conn = st.connection("gsheets", 
+                            type=GSheetsConnection, 
+                            service_account_info=google_info)
     else:
-        st.error("Błąd: Brak sekcji [connections.gsheets] w Secrets!")
+        st.error("Błąd: Sprawdź czy masz poprawnie wypełnione Secrets w Streamlit Cloud.")
         st.stop()
 except Exception as e:
-    st.error(f"Błąd inicjalizacji: {e}")
+    st.error(f"Wystąpił problem przy starcie: {e}")
     st.stop()
 
 def fetch_data(sheet_name):
     try:
+        # Przekazujemy URL arkusza bezpośrednio do funkcji czytającej
         return conn.read(spreadsheet=SHEET_URL, worksheet=sheet_name, ttl=0)
     except Exception as e:
-        st.warning(f"Błąd odczytu '{sheet_name}': {e}")
+        st.warning(f"Nie mogę otworzyć zakładki '{sheet_name}'. Sprawdź czy nazwa jest identyczna w Google Sheets.")
         return pd.DataFrame()
 
 # --- NAWIGACJA ---
 with st.sidebar:
-    st.markdown("# 💄 Menu")
+    st.markdown("# 💄 Menu Retro")
     st.image("https://www.freeiconspng.com/uploads/retro-pin-up-girl-png-10.png", width=150)
-    choice = st.radio("Sekcja:", ["Podsumowanie", "Wydatki", "Przychody", "Zobowiązania", "Lista Zakupów"])
+    choice = st.radio("Sekcja:", ["Salon (Podsumowanie)", "Dodaj Wydatek", "Dodaj Przychód", "Zobowiązania", "Lista Zakupów"])
 
 # --- WIDOKI ---
 
-if choice == "Podsumowanie":
+if choice == "Salon (Podsumowanie)":
     st.title("👗 Twój Budżetowy Salon")
     
     df_wyd = fetch_data("Wydatki")
     df_prz = fetch_data("Przychody")
     df_osz = fetch_data("Oszczednosci")
     
+    # Przeliczanie danych
     total_in = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
     total_out = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
     total_savings = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Wpływy", f"{total_in:,.2f} zł")
-    c2.metric("Wydatki", f"{total_out:,.2f} zł")
-    c3.metric("Oszczędności", f"{total_savings:,.2f} zł")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Wpływy", f"{total_in:,.2f} zł")
+    col2.metric("Wydatki", f"{total_out:,.2f} zł")
+    col3.metric("Oszczędności", f"{total_savings:,.2f} zł")
 
     st.markdown("### 📸 Ostatnie wpisy")
     if not df_wyd.empty:
         st.dataframe(df_wyd.tail(10), use_container_width=True)
 
-elif choice == "Wydatki":
-    st.title("🛍️ Dodaj Wydatek")
+elif choice == "Dodaj Wydatek":
+    st.title("🛍️ Nowy Paragon")
     with st.form("exp_form", clear_on_submit=True):
-        nazwa = st.text_input("Co kupiłaś?")
+        nazwa = st.text_input("Nazwa zakupu")
         kwota = st.number_input("Kwota (PLN)", min_value=0.0, step=0.01)
         kat = st.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
         typ = st.selectbox("Typ", ["Zmienny", "Stały"])
@@ -143,9 +142,9 @@ elif choice == "Wydatki":
             existing = fetch_data("Wydatki")
             updated = pd.concat([existing, new_row], ignore_index=True)
             conn.update(spreadsheet=SHEET_URL, worksheet="Wydatki", data=updated)
-            st.success("Zapisano! ✨")
+            st.success("Zapisano! Dbasz o dom fantastycznie! ✨")
 
-elif choice == "Przychody":
+elif choice == "Dodaj Przychód":
     st.title("💵 Dodaj Przychód")
     with st.form("inc_form", clear_on_submit=True):
         nazwa_p = st.text_input("Źródło")
@@ -160,10 +159,10 @@ elif choice == "Przychody":
             existing_p = fetch_data("Przychody")
             updated_p = pd.concat([existing_p, new_row_p], ignore_index=True)
             conn.update(spreadsheet=SHEET_URL, worksheet="Przychody", data=updated_p)
-            st.success("Wpływy zapisane! 🍒")
+            st.success("Wpływy dodane do budżetu! 🍒")
 
 elif choice == "Zobowiązania":
-    st.title("📅 Raty i Koszty")
+    st.title("📅 Twoje Raty i Koszty")
     st.markdown("### 💎 Raty")
     st.dataframe(fetch_data("Raty"), use_container_width=True)
     st.markdown("### 🏠 Koszty Stałe")
@@ -172,12 +171,14 @@ elif choice == "Zobowiązania":
 elif choice == "Lista Zakupów":
     st.title("📝 Lista zakupów")
     df_zak = fetch_data("Zakupy")
-    new_prod = st.text_input("Co dopisać?")
-    if st.button("DODAJ"):
-        new_row_z = pd.DataFrame([{"Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Produkt": new_prod}])
-        updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
-        conn.update(spreadsheet=SHEET_URL, worksheet="Zakupy", data=updated_z)
-        st.rerun()
+    
+    new_prod = st.text_input("Dopisz produkt:")
+    if st.button("DODAJ DO LISTY"):
+        if new_prod:
+            new_row_z = pd.DataFrame([{"Data i Godzina": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Produkt": new_prod}])
+            updated_z = pd.concat([df_zak, new_row_z], ignore_index=True)
+            conn.update(spreadsheet=SHEET_URL, worksheet="Zakupy", data=updated_z)
+            st.rerun()
     
     st.markdown("---")
     if not df_zak.empty:
