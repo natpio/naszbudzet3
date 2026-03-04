@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Retro Budżet Domowy", page_icon="💄", layout="centered")
+st.set_page_config(page_title="Retro Budżet", page_icon="💄", layout="centered")
 
 # --- STYLIZACJA RETRO ---
 st.markdown("""
@@ -22,52 +22,59 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- PANCERNE POŁĄCZENIE ---
-@st.cache_resource
-def connect_to_gsheets():
-    try:
-        # Pobieramy dane jako słownik bezpośrednio z obiektu Secrets
-        s = st.secrets["connections"]["gsheets"]
-        
-        # Ekstrakcja klucza i wymuszenie poprawnego formatowania \n
-        # To naprawia błąd InvalidByte(64, 91)
-        raw_key = s["private_key"]
-        clean_key = raw_key.replace("\\n", "\n")
-        
-        # Jeśli klucz został wklejony z cudzysłowami na końcach, usuwamy je
-        clean_key = clean_key.strip('"').strip("'")
+# --- FUNKCJA NAPRAWCZA DLA KLUCZA ---
+def get_clean_key(raw_key):
+    # Zamień tekstowe \n na rzeczywiste znaki nowej linii
+    key = raw_key.replace("\\n", "\n")
+    # Usuń ewentualne spacje i cudzysłowy, które Streamlit mógł dodać przy parsowaniu TOML
+    lines = key.split("\n")
+    clean_lines = [line.strip() for line in lines if line.strip()]
+    return "\n".join(clean_lines)
 
+# --- POŁĄCZENIE ---
+@st.cache_resource
+def init_connection():
+    try:
+        # Pobieramy sekcję gsheets jako słownik
+        creds = st.secrets["connections"]["gsheets"]
+        
+        # Kluczowe: ręczne wyczyszczenie klucza przed wysłaniem do biblioteki google-auth
+        fixed_key = get_clean_key(creds["private_key"])
+        
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
         
-        creds_info = {
-            "type": "service_account",
-            "project_id": s["project_id"],
-            "private_key_id": s["private_key_id"],
-            "private_key": clean_key,
-            "client_email": s["client_email"],
-            "client_id": s["client_id"],
-            "auth_uri": s["auth_uri"],
-            "token_uri": s["token_uri"],
-            "auth_provider_x509_cert_url": s["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": s["client_x509_cert_url"],
-        }
+        # Budujemy obiekt poświadczeń od zera
+        credentials = Credentials.from_service_account_info(
+            {
+                "type": "service_account",
+                "project_id": creds["project_id"],
+                "private_key_id": creds["private_key_id"],
+                "private_key": fixed_key,
+                "client_email": creds["client_email"],
+                "client_id": creds["client_id"],
+                "auth_uri": creds["auth_uri"],
+                "token_uri": creds["token_uri"],
+                "auth_provider_x509_cert_url": creds["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": creds["client_x509_cert_url"],
+            },
+            scopes=scopes
+        )
         
-        credentials = Credentials.from_service_account_info(creds_info, scopes=scopes)
         gc = gspread.authorize(credentials)
-        return gc.open_by_url(s["spreadsheet"])
+        return gc.open_by_url(creds["spreadsheet"])
     except Exception as e:
         st.error(f"❌ Krytyczny błąd autoryzacji: {e}")
         return None
 
-sh = connect_to_gsheets()
+sh = init_connection()
 
-def load_data(name):
+def load_data(sheet_name):
     if sh:
         try:
-            return pd.DataFrame(sh.worksheet(name).get_all_records())
+            return pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
         except:
             return pd.DataFrame()
     return pd.DataFrame()
@@ -75,57 +82,54 @@ def load_data(name):
 # --- INTERFEJS ---
 with st.sidebar:
     st.markdown("# 💄 Menu")
-    view = st.radio("Wybierz:", ["Podsumowanie", "Wydatki", "Przychody", "Raty", "Zakupy"])
+    view = st.radio("Sekcja:", ["Salon", "Wydatki", "Przychody", "Raty", "Zakupy"])
 
-if view == "Podsumowanie":
-    st.title("👗 Salon Budżetowy")
+if view == "Salon":
+    st.title("👗 Salon")
     df_wyd = load_data("Wydatki")
     df_prz = load_data("Przychody")
     df_osz = load_data("Oszczednosci")
     
     in_sum = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
     out_sum = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
-    save_sum = pd.to_numeric(df_osz["Suma"], errors='coerce').iloc[-1] if not df_osz.empty else 0
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Wpływy", f"{in_sum:,.2f} zł")
-    c2.metric("Wydatki", f"{out_sum:,.2f} zł")
-    c3.metric("Skarbonka", f"{save_sum:,.2f} zł")
     
+    col1, col2 = st.columns(2)
+    col1.metric("Wpływy", f"{in_sum:,.2f} zł")
+    col2.metric("Wydatki", f"{out_sum:,.2f} zł")
     st.dataframe(df_wyd.tail(10), use_container_width=True)
 
 elif view == "Wydatki":
-    st.title("🛍️ Dodaj Wydatek")
-    with st.form("form_exp", clear_on_submit=True):
-        item = st.text_input("Nazwa")
-        price = st.number_input("Kwota", min_value=0.0)
+    st.title("🛍️ Wydatek")
+    with st.form("f1", clear_on_submit=True):
+        n = st.text_input("Nazwa")
+        k = st.number_input("Kwota", min_value=0.0)
         cat = st.selectbox("Kat.", ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"])
-        if st.form_submit_button("DODAJ"):
+        if st.form_submit_button("ZAPISZ"):
             if sh:
-                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), item, price, cat, "Zmienny"])
+                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), n, k, cat, "Zmienny"])
                 st.success("Zapisano! ✨")
 
 elif view == "Przychody":
-    st.title("💵 Dodaj Przychód")
-    with st.form("form_inc", clear_on_submit=True):
-        source = st.text_input("Źródło")
-        amount = st.number_input("Kwota", min_value=0.0)
-        if st.form_submit_button("ZAPISZ"):
+    st.title("💵 Przychód")
+    with st.form("f2", clear_on_submit=True):
+        s = st.text_input("Źródło")
+        a = st.number_input("Kwota", min_value=0.0)
+        if st.form_submit_button("DODAJ"):
             if sh:
-                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), source, amount])
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), s, a])
                 st.success("Dodano! 🍒")
 
 elif view == "Raty":
-    st.title("📅 Raty i Opłaty")
+    st.title("📅 Raty")
     st.dataframe(load_data("Raty"), use_container_width=True)
 
 elif view == "Zakupy":
-    st.title("📝 Lista Zakupów")
+    st.title("📝 Lista")
     df_zak = load_data("Zakupy")
-    new_item = st.text_input("Co kupić?")
+    new = st.text_input("Co kupić?")
     if st.button("DODAJ"):
-        if sh and new_item:
-            sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_item])
+        if sh and new:
+            sh.worksheet("Zakupy").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new])
             st.rerun()
     if not df_zak.empty:
         for p in df_zak["Produkt"]:
