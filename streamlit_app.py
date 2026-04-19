@@ -6,163 +6,134 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="Midwest Budget: FinTech Edition", page_icon="🏈", layout="wide", initial_sidebar_state="collapsed")
 
-# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + ZABÓJCA BIAŁEGO PASKA ---
+# --- STYLIZACJA: FINTECH ZERO + MIDWEST VIBE ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
-    /* =========================================================
-       PRZEZROCZYSTY HEADER (BEZ BIAŁEGO PASKA)
-       ========================================================= */
-    [data-testid="stHeader"], header, .stAppHeader {
-        background-color: transparent !important;
-        background: transparent !important;
-        box-shadow: none !important;
-    }
+    /* UKRYCIE RELIKTÓW (Pasek boczny, Header, Footer) */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
+    [data-testid="stHeader"], header, .stAppHeader { background: transparent !important; box-shadow: none !important; }
+    [data-testid="stToolbar"], #MainMenu, footer, .stDeployButton { display: none !important; }
     
-    /* Ukrycie prawego menu (Deploy, 3 kropki) */
-    [data-testid="stToolbar"] { display: none !important; }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    
-    .block-container { padding-top: 2rem !important; }
+    .block-container { padding-top: 1rem !important; max-width: 900px; } /* Węższy układ przypominający aplikację w telefonie */
 
-    /* =========================================================
-       JASKRAWY PRZYCISK MENU NA TELEFONY (HAMBURGER)
-       ========================================================= */
-    [data-testid="collapsedControl"] {
-        background-color: #c83803 !important; /* Bears Orange */
-        border: 2px solid #ffffff !important;
-        border-radius: 8px !important;
-        margin-top: 10px !important;
-        margin-left: 10px !important;
-        padding: 5px !important;
-        z-index: 999999 !important; /* Zawsze na wierzchu */
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
-        transition: transform 0.2s;
-    }
-    [data-testid="collapsedControl"]:hover {
-        transform: scale(1.1);
-    }
-    [data-testid="collapsedControl"] svg {
-        fill: #ffffff !important; /* Biała ikona */
-        color: #ffffff !important;
-        width: 25px !important;
-        height: 25px !important;
-    }
-
-    /* =========================================================
-       TŁO GŁÓWNE Z GITHUBA
-       ========================================================= */
+    /* TŁO GŁÓWNE Z GITHUBA */
     .stApp {
         background-image: url('https://raw.githubusercontent.com/natpio/naszbudzet3/refs/heads/main/1776619317829.jpg');
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
+        background-size: cover; background-position: center; background-attachment: fixed;
         font-family: 'Roboto', sans-serif;
     }
-    
     .stApp::before {
         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(26, 37, 44, 0.88); z-index: -1;
+        background-color: rgba(15, 23, 42, 0.90); z-index: -1; /* Głęboki, elegancki granat */
     }
 
-    [data-testid="block-container"] {
-        background-color: rgba(248, 250, 252, 0.95); 
-        padding: 30px; border-radius: 8px; border: 8px solid #0f172a;
-        box-shadow: 15px 15px 0px rgba(0,0,0,0.6);
-        margin-bottom: 2rem;
+    /* KONTENER NA TREŚĆ */
+    .main-container {
+        background-color: rgba(248, 250, 252, 0.95); padding: 25px; border-radius: 15px; 
+        border: 4px solid #002244; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
     }
 
-    h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #c8102e !important; text-transform: uppercase; letter-spacing: 2px; }
+    /* NAGŁÓWKI */
+    h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #c8102e !important; text-transform: uppercase; letter-spacing: 1px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #002244 !important; text-transform: uppercase; }
 
     /* =========================================================
-       PASEK BOCZNY - PIŁKI
+       NOWOCZESNA NAWIGACJA (TABS JAKO MENU)
        ========================================================= */
-    [data-testid="stSidebar"] {
-        background-color: #002244; border-right: 8px solid #c83803;
-        background-image: 
-            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='50' rx='35' ry='20' fill='%23c83803'/%3E%3Cpath d='M30,50 h40 M50,35 v30 M42,40 v20 M58,40 v20' stroke='%23f8fafc' stroke-width='2' fill='none'/%3E%3C/svg%3E"),
-            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='20' fill='%23f8fafc'/%3E%3Cpath d='M35,38 A22,22 0 0,0 65,62 M65,38 A22,22 0 0,1 35,62' stroke='%23c8102e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-        background-size: 60px 60px, 50px 50px; background-position: 0 0, 30px 30px; background-repeat: repeat, repeat;
+    [data-testid="stTabs"] [data-baseweb="tab-list"] {
+        background-color: rgba(0, 34, 68, 0.85); /* Bears Navy */
+        border-radius: 12px; padding: 5px; gap: 5px; justify-content: center;
+        margin-bottom: 20px;
     }
-    [data-testid="stSidebar"]::before {
-        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 34, 68, 0.85); z-index: 0;
+    [data-testid="stTabs"] [data-baseweb="tab"] {
+        color: #e2e8f0; font-family: 'Oswald', sans-serif !important; font-size: 1rem;
+        border-radius: 8px; padding: 8px 15px; border: none; background: transparent;
     }
-    [data-testid="stSidebarNav"], [data-testid="stSidebar"] div, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { z-index: 1; position: relative; }
-    [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #f8fafc !important; font-family: 'Oswald', sans-serif !important; font-weight: bold; }
+    [data-testid="stTabs"] [data-baseweb="tab"]:hover { background-color: rgba(255,255,255,0.1); }
+    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+        background-color: #c83803 !important; /* Bears Orange */
+        color: white !important; font-weight: bold;
+    }
+    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p {
+        color: white !important;
+    }
 
     /* =========================================================
-       HERO CARDS (Główne Liczniki)
+       WIELKI PRZYCISK DODAWANIA (Bohater Ekranu)
+       ========================================================= */
+    .stButton>button[kind="primary"] {
+        background: linear-gradient(90deg, #c83803 0%, #ff5722 100%);
+        color: white !important; border: none; border-radius: 30px;
+        font-family: 'Bebas Neue', cursive; font-size: 1.8rem !important; letter-spacing: 2px;
+        padding: 15px !important; box-shadow: 0 10px 20px rgba(200, 56, 3, 0.4);
+        transition: transform 0.2s; width: 100%;
+    }
+    .stButton>button[kind="primary"]:active { transform: scale(0.95); }
+
+    /* Zwykłe przyciski */
+    .stButton>button[kind="secondary"] {
+        background-color: #002244; color: white !important; border: 2px solid #002244; border-radius: 8px;
+        font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%; font-weight: bold;
+    }
+
+    /* =========================================================
+       KARTY (SCOREBOARD)
        ========================================================= */
     .hero-card {
-        background-color: #006b3d; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; 
-        box-shadow: 0 10px 20px rgba(0,0,0,0.4); text-align: center; color: white; margin-bottom: 20px;
+        background-color: #006b3d; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; 
+        box-shadow: 0 8px 15px rgba(0,0,0,0.3); text-align: center; color: white; margin-bottom: 15px;
     }
-    
     .hero-card.interstate {
-        background-color: #003882; border: 4px solid #ffffff; border-top: 15px solid #c8102e; 
-        border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 20px;
+        background-color: #003882; border: 3px solid #ffffff; border-top: 12px solid #c8102e; 
+        border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.5); text-align: center; color: white; margin-bottom: 15px;
     }
-    
-    .hero-card.danger { background-color: #c8102e; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; text-align: center; color: white; margin-bottom: 20px; }
+    .hero-card.danger { background-color: #c8102e; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; text-align: center; color: white; margin-bottom: 15px; }
 
-    .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3.5rem !important; margin: 5px 0; text-shadow: none; font-family: 'Bebas Neue', cursive !important; }
-    .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1.2rem; text-transform: uppercase; margin: 0; font-family: 'Roboto', sans-serif !important; }
+    .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3rem !important; margin: 0; font-family: 'Bebas Neue', cursive !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; font-family: 'Roboto', sans-serif !important; opacity: 0.9; }
 
-    /* =========================================================
-       METRYKI (Wpływy, Koszty, Odkłożono)
-       ========================================================= */
+    /* Metryki (Małe kafelki) */
     [data-testid="stMetric"] { 
-        background-color: rgba(17, 34, 68, 0.95) !important; border: 3px solid #c83803 !important; 
-        border-radius: 12px !important; padding: 15px !important; text-align: center !important; box-shadow: 0 8px 15px rgba(0,0,0,0.8) !important; 
+        background-color: #0f172a !important; border: 2px solid #c83803 !important; 
+        border-radius: 10px !important; padding: 10px !important; text-align: center !important; 
     }
-    [data-testid="stMetricValue"] div { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; font-size: 2.5rem !important; text-shadow: 2px 2px 4px black !important; }
-    [data-testid="stMetricLabel"] p { color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase !important; font-family: 'Roboto', sans-serif !important; }
+    [data-testid="stMetricValue"] div { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; font-size: 2rem !important; }
+    [data-testid="stMetricLabel"] p { color: #94a3b8 !important; font-weight: 700 !important; text-transform: uppercase !important; font-family: 'Roboto', sans-serif !important; font-size: 0.8rem !important; }
 
-    /* Przycisk */
-    .stButton>button {
-        background-color: #002244; color: #ffffff !important; border: 3px solid #c83803; border-radius: 4px;
-        font-weight: 900; font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%;
+    /* Modale (Wyskakujące okienka) */
+    div[data-testid="stDialog"] div[role="dialog"] {
+        border: 4px solid #002244; border-radius: 15px;
+    }
+    div[data-testid="stDialog"] h2 {
+        color: #002244 !important; text-align: center; font-family: 'Oswald', sans-serif !important;
     }
 
-    .ticker-tape { background-color: #111; color: #ffb612; font-family: 'Roboto', monospace; font-weight: bold; padding: 10px; border: 4px solid #333; font-size: 1.2rem; margin-bottom: 30px; text-transform: uppercase; }
-
-    /* --- MOBILE RWD --- */
     @media (max-width: 768px) {
-        [data-testid="block-container"] { padding: 15px !important; border-width: 4px !important; margin-top: 0 !important; }
-        .hero-card h2, .hero-card.interstate h2 { font-size: 2.2rem !important; }
-        h1 { font-size: 2rem !important; }
-        .stButton>button { font-size: 1rem !important; height: 3.5rem !important; }
-        .ticker-tape { font-size: 0.9rem !important; padding: 5px !important; }
+        .block-container { padding: 10px !important; }
+        [data-testid="stTabs"] [data-baseweb="tab"] { font-size: 0.8rem; padding: 8px 10px; }
+        .hero-card h2, .hero-card.interstate h2 { font-size: 2.5rem !important; }
+        .stButton>button[kind="primary"] { font-size: 1.5rem !important; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE Z BAZĄ ---
+# --- BAZA DANYCH ---
 @st.cache_resource
 def init_connection():
     try:
         creds = st.secrets["connections"]["gsheets"]
         fixed_key = creds["private_key"].replace("\\n", "\n").strip()
         credentials = Credentials.from_service_account_info(
-            {
-                "type": "service_account",
-                "project_id": creds["project_id"],
-                "private_key": fixed_key,
-                "client_email": creds["client_email"],
-                "token_uri": creds["token_uri"],
-            },
+            {"type": "service_account", "project_id": creds["project_id"], "private_key": fixed_key, "client_email": creds["client_email"], "token_uri": creds["token_uri"]},
             scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         )
         return gspread.authorize(credentials).open_by_url(creds["spreadsheet"])
     except Exception as e:
-        st.error(f"Foul! Błąd silnika: {e}")
+        st.error(f"Błąd silnika: {e}")
         return None
 
 sh = init_connection()
@@ -170,8 +141,7 @@ sh = init_connection()
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
-        if not df.empty and 'Data' in df.columns:
-            df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+        if not df.empty and 'Data' in df.columns: df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
         return df
     except: return pd.DataFrame()
 
@@ -179,40 +149,78 @@ def save_df(sheet_name, df):
     sheet = sh.worksheet(sheet_name)
     sheet.clear()
     df_save = df.copy()
-    if 'Data' in df_save.columns:
-        df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    if 'Data' in df_save.columns: df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
-    st.toast(f"🏈 Touchdown! Wynik zapisany: {sheet_name}!", icon="🎯")
+    st.toast(f"Zapisano w chmurze: {sheet_name}!", icon="☁️")
 
-# --- NAWIGACJA (PLAYBOOK) ---
-st.sidebar.markdown("<h1 style='color:white !important; font-size: 2.5rem;'>📋 PLAYBOOK</h1>", unsafe_allow_html=True)
+# POBIERANIE DANYCH RAZ NA START ZAPOBIEGA OPÓŹNIENIOM
+prz_all = load_df("Przychody")
+wyd_all = load_df("Wydatki")
+zob_all = load_df("Zobowiazania")
+osz_all = load_df("Oszczednosci")
+
+# --- WYSKAKUJĄCE OKNO (SMART MODAL) ---
+@st.dialog("CO ROBIMY, COACHU? 🏈")
+def add_operation_modal():
+    akcja = st.radio("Wybierz typ operacji:", ["📉 Wydaję pieniądze (Zakupy)", "📈 Dostałem przelew (Wpływ)", "🏦 Skarbiec (Sejf)"], horizontal=True)
+    st.write("---")
+    
+    if akcja == "📉 Wydaję pieniądze (Zakupy)":
+        n = st.text_input("Gdzie/Na co wydałeś?")
+        k = st.number_input("Ile to kosztowało? (zł)", min_value=0.0, step=1.0)
+        if st.button("Zanotuj Wydatek", use_container_width=True):
+            if k > 0 and n:
+                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), n, "Codzienne", k])
+                st.rerun()
+
+    elif akcja == "📈 Dostałem przelew (Wpływ)":
+        z = st.text_input("Od kogo ta kasa?")
+        kw = st.number_input("Ile wpłynęło? (zł)", min_value=0.0)
+        if st.button("Zaksięguj Przelew", use_container_width=True):
+            if z and kw > 0:
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
+                st.rerun()
+
+    elif akcja == "🏦 Skarbiec (Sejf)":
+        cl = st.text_input("Na jaki cel w Iowa?")
+        kwo = st.number_input("Podaj kwotę (zł)", min_value=0.0)
+        typ_osz = st.selectbox("Typ", ["Wpłata", "Wypłata"])
+        if st.button("Zarygluj Skarbiec", use_container_width=True):
+            if cl and kwo > 0:
+                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cl, kwo, typ_osz])
+                st.rerun()
+
+# --- GŁÓWNY INTERFEJS (FINTECH ZERO) ---
+
+# 1. Kontekst Globalny (Miesiąc/Rok)
+st.markdown("<div style='background-color: rgba(255,255,255,0.9); padding: 10px; border-radius: 10px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+c_m, c_y = st.columns(2)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
-wybrany_m_nazwa = st.sidebar.selectbox("Miesiąc:", miesiące, index=datetime.now().month - 1)
-wybrany_rok = st.sidebar.selectbox("Sezon:", [2024, 2025, 2026], index=2)
+wybrany_m_nazwa = c_m.selectbox("MIESIĄC ROZLICZENIOWY:", miesiące, index=datetime.now().month - 1)
+wybrany_rok = c_y.selectbox("SEZON:", [2024, 2025, 2026], index=2)
+st.markdown("</div>", unsafe_allow_html=True)
+
 m_idx = miesiące.index(wybrany_m_nazwa) + 1
 selected_date = date(wybrany_rok, m_idx, 1)
 
-menu = st.sidebar.radio("Taktyka:", ["🏙️ L-Train (Kokpit)", "🛒 Zakupy (Codzienne)", "🏢 Stałe (Zobowiązania)", "📥 Wpływy", "🌽 Sejf"])
+# 2. Główny Przycisk Akcji
+if st.button("➕ DODAJ OPERACJĘ", type="primary"):
+    add_operation_modal()
 
-# --- WIDOKI ---
-if menu == "🏙️ L-Train (Kokpit)":
-    st.markdown("<h1 style='text-align:center;'>WINDY CITY SCOREBOARD</h1>", unsafe_allow_html=True)
-    st.markdown(f"<div class='ticker-tape'><marquee scrollamount='8'>❄️ OSTRZEŻENIE: Zbliża się zamieć z nad Jeziora Michigan! ❄️ Twój bilans finansowy na sezon {wybrany_m_nazwa.upper()} {wybrany_rok} ❄️</marquee></div>", unsafe_allow_html=True)
-    
-    prz = load_df("Przychody")
-    wyd_c = load_df("Wydatki")
-    zob = load_df("Zobowiazania")
-    osz = load_df("Oszczednosci")
-    
+# 3. Płaska Nawigacja (Zakładki)
+t1, t2, t3, t4 = st.tabs(["🏠 KOKPIT", "📜 HISTORIA", "🏢 STAŁE KOSZTY", "🌽 SEJF (DES MOINES)"])
+
+with t1:
+    st.markdown("<div class='main-container'>", unsafe_allow_html=True)
     m_str = selected_date.strftime("%Y-%m")
-    prz_m = prz[prz['Data'].dt.strftime("%Y-%m") == m_str] if not prz.empty else pd.DataFrame()
-    wyd_m = wyd_c[wyd_c['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_c.empty else pd.DataFrame()
-    osz_m = osz[osz['Data'].dt.strftime("%Y-%m") == m_str] if not osz.empty else pd.DataFrame()
+    
+    prz_m = prz_all[prz_all['Data'].dt.strftime("%Y-%m") == m_str] if not prz_all.empty else pd.DataFrame()
+    wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
+    osz_m = osz_all[osz_all['Data'].dt.strftime("%Y-%m") == m_str] if not osz_all.empty else pd.DataFrame()
     
     s_prz = prz_m['Kwota'].sum() if not prz_m.empty else 0
     s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
-    s_zobowiazania = zob['Kwota'].sum() if not zob.empty else 0
-    
+    s_zobowiazania = zob_all['Kwota'].sum() if not zob_all.empty else 0
     w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if (not osz_m.empty and 'Akcja' in osz_m.columns) else 0
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
@@ -225,82 +233,60 @@ if menu == "🏙️ L-Train (Kokpit)":
         
     dniowka = wolne / pozostalo_dni if pozostalo_dni > 0 and wolne > 0 else 0
 
-    c_h1, c_h2 = st.columns(2)
-    with c_h1:
-        st.markdown(f"<div class='hero-card'><p>I-80 FUNDS (W PORTFELU)</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
-    with c_h2:
-        klasa = "hero-card danger" if dniowka < 50 else "hero-card interstate"
-        st.markdown(f"<div class='{klasa}'><p>LIMIT NA DZIEŃ ({pozostalo_dni} DNI)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='hero-card'><p>I-80 FUNDS (W PORTFELU)</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
+    
+    klasa = "hero-card danger" if dniowka < 50 else "hero-card interstate"
+    st.markdown(f"<div class='{klasa}'><p>LIMIT NA DZIEŃ ({pozostalo_dni} DNI)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
 
-    st.write("---")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Wpływy", f"{s_prz:,.2f} zł")
-    col2.metric("Stałe koszty", f"{s_zobowiazania:,.2f} zł")
-    col3.metric("Odkłożono", f"{w_osz:,.2f} zł")
+    cm1, cm2, cm3 = st.columns(3)
+    cm1.metric("Wpływy w miesiącu", f"{s_prz:,.2f} zł")
+    cm2.metric("Opłaty za mury", f"{s_zobowiazania:,.2f} zł")
+    cm3.metric("Odkłożono", f"{w_osz:,.2f} zł")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-elif menu == "🛒 Zakupy (Codzienne)":
-    st.markdown("<h1>🛒 Daily Scrimmage</h1>", unsafe_allow_html=True)
-    st.info("Data i godzina wskoczą same. Wpisz tylko ile wydałeś.")
-    with st.form("quick", clear_on_submit=True):
-        c1, c2 = st.columns([2,1])
-        n = c1.text_input("Co kupione?")
-        k = c2.number_input("Kwota (zł)", min_value=0.0, step=1.0)
-        if st.form_submit_button("🏈 ZAPISZ WYDATEK"):
-            if k > 0 and n:
-                teraz = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                sh.worksheet("Wydatki").append_row([teraz, n, "Codzienne", k])
-                st.rerun()
+with t2:
+    st.markdown("<div class='main-container'>", unsafe_allow_html=True)
+    st.markdown("<h3>📜 Ostatnie Akcje na Koncie</h3>")
+    st.write("Twoje codzienne wydatki (wybierz miesiąc z paska na górze).")
+    
+    m_str = selected_date.strftime("%Y-%m")
+    wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
+    
+    if not wyd_m.empty:
+        ed_w = st.data_editor(wyd_m.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
+        if st.button("💾 Zapisz korektę historii wydatków"): save_df("Wydatki", ed_w)
+    else:
+        st.info("Brak wydatków w tym miesiącu. Użyj przycisku DODAJ OPERACJĘ na górze ekranu.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    df_w = load_df("Wydatki")
-    if not df_w.empty:
-        ed_w = st.data_editor(df_w.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
-        if st.button("💾 Zapisz zmiany"): save_df("Wydatki", ed_w)
-
-elif menu == "🏢 Stałe (Zobowiązania)":
-    st.markdown("<h1>🏢 Willis Tower Contracts</h1>", unsafe_allow_html=True)
-    st.write("Subskrypcje, Raty, Czynsz. Wszystko co stałe.")
-    df_z = load_df("Zobowiazania")
-    with st.expander("➕ Dodaj nowe zobowiązanie"):
-        with st.form("add_z", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            nz = c1.text_input("Nazwa")
-            kz = c2.number_input("Kwota", min_value=0.0)
-            tz = st.selectbox("Typ", ["Subskrypcja", "Koszt Stały", "Rata"])
-            if st.form_submit_button("Podpisz kontrakt"):
+with t3:
+    st.markdown("<div class='main-container'>", unsafe_allow_html=True)
+    st.markdown("<h3>🏢 Kontrakty i Rachunki</h3>")
+    st.write("Abonamenty, kredyty, prąd. Wprowadzasz to tylko raz, system automatycznie obciąży Twój budżet w każdym miesiącu.")
+    
+    with st.expander("📝 Dodaj nowy stały rachunek (Kontrakt)"):
+        with st.form("f_zob"):
+            nz = st.text_input("Nazwa (np. Czynsz)")
+            kz = st.number_input("Kwota stała", min_value=0.0)
+            tz = st.selectbox("Typ", ["Subskrypcja", "Koszt Stały", "Rata Kredytu"])
+            if st.form_submit_button("Podpisz umowę"):
                 if nz and kz > 0:
                     sh.worksheet("Zobowiazania").append_row([nz, tz, kz])
                     st.rerun()
-    if not df_z.empty:
-        ed_z = st.data_editor(df_z, hide_index=True, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Zaktualizuj bazę"): save_df("Zobowiazania", ed_z)
+                    
+    if not zob_all.empty:
+        ed_z = st.data_editor(zob_all, hide_index=True, num_rows="dynamic", use_container_width=True)
+        if st.button("💾 Zapisz zmiany w rachunkach"): save_df("Zobowiazania", ed_z)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-elif menu == "📥 Wpływy":
-    st.markdown("<h1>⚾ Box Office</h1>", unsafe_allow_html=True)
-    with st.form("add_p", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        z = c1.text_input("Źródło")
-        kw = c2.number_input("Kwota", min_value=0.0)
-        if st.form_submit_button("💰 Dodaj wpływ"):
-            if z and kw > 0:
-                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
-                st.rerun()
-    df_p = load_df("Przychody")
-    if not df_p.empty:
-        ed_p = st.data_editor(df_p.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Nadpisz"): save_df("Przychody", ed_p)
-
-elif menu == "🌽 Sejf":
-    st.markdown("<h1>🌽 Des Moines Vault</h1>", unsafe_allow_html=True)
-    with st.form("add_o", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        cl = c1.text_input("Cel")
-        kwo = c2.number_input("Kwota", min_value=0.0)
-        ak = c3.selectbox("Akcja", ["Wpłata", "Wypłata"])
-        if st.form_submit_button("🏦 Zamknij sejf"):
-            if cl and kwo > 0:
-                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cl, kwo, ak])
-                st.rerun()
-    df_o = load_df("Oszczednosci")
-    if not df_o.empty:
-        ed_o = st.data_editor(df_o.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Zapisz"): save_df("Oszczednosci", ed_o)
+with t4:
+    st.markdown("<div class='main-container'>", unsafe_allow_html=True)
+    st.markdown("<h3>🌽 Skarbiec Des Moines</h3>")
+    st.write("Rejestr odłożonych funduszy. Żeby dodać lub wypłacić środki, użyj głównego przycisku DODAJ OPERACJĘ na górze.")
+    
+    if not osz_all.empty:
+        ed_o = st.data_editor(osz_all.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
+        if st.button("💾 Zapisz korekty w sejfie"): save_df("Oszczednosci", ed_o)
+    else:
+        st.info("Sejf jest pusty.")
+    st.markdown("</div>", unsafe_allow_html=True)
