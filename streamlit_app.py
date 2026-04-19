@@ -84,14 +84,11 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- SYSTEM LOGOWANIA Z CIASTECZKAMI (COOKIES) ---
-# Inicjalizacja menedżera ciasteczek
 cookie_manager = stx.CookieManager()
 
 def check_password():
-    # Odczytanie ciasteczka logowania (jeśli istnieje)
     auth_cookie = cookie_manager.get(cookie="midwest_auth")
     
-    # Zwróć True jeśli ciasteczko mówi "zalogowany" LUB jeśli w tej sesji wpisano już hasło
     if auth_cookie == "granted" or st.session_state.get("password_correct"):
         return True
 
@@ -102,16 +99,13 @@ def check_password():
         haslo = st.text_input("Hasło:", type="password")
         if st.form_submit_button("WEJDŹ NA BOISKO (Zaloguj)", use_container_width=True):
             if haslo == st.secrets.get("app_password", ""):
-                # 1. Zapisz w pamięci krótkiej (dla płynności)
                 st.session_state["password_correct"] = True
-                # 2. Upiecz ciasteczko w przeglądarce (30 dni = 30 * 24h * 60m * 60s)
                 cookie_manager.set("midwest_auth", "granted", max_age=30 * 24 * 60 * 60)
                 st.rerun()
             else:
                 st.error("❌ Błędne hasło. Sędzia odgwizdał faul.")
     return False
 
-# Zatrzymuje skrypt w tym miejscu, jeśli nie jesteśmy zalogowani
 if not check_password():
     st.stop()
 
