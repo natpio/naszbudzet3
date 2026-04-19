@@ -46,9 +46,52 @@ st.markdown("""
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #c8102e !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #002244 !important; text-transform: uppercase; }
 
-    /* Sidebar - Styl Chicago Bears */
-    [data-testid="stSidebar"] { background-color: #002244; border-right: 8px solid #c83803; }
-    [data-testid="stSidebarNav"], [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #f8fafc !important; font-family: 'Oswald', sans-serif; }
+    /* =========================================================
+       PASEK BOCZNY - OBSIANY PIŁKAMI (BASEBALL & FOOTBALL)
+       ========================================================= */
+    [data-testid="stSidebar"] {
+        /* Bazowy kolor Chicago Bears Navy */
+        background-color: #002244; 
+        border-right: 8px solid #c83803; /* Bears Orange */
+
+        /* WZÓR PIŁEK (Encoded SVGs) */
+        background-image: 
+            /* Piłka Footballowa (Pomarańczowa Bears z białą nitką) */
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='50' rx='35' ry='20' fill='%23c83803'/%3E%3Cpath d='M30,50 h40 M50,35 v30 M42,40 v20 M58,40 v20' stroke='%23f8fafc' stroke-width='2' fill='none'/%3E%3C/svg%3E"),
+            /* Piłka Baseballowa (Biała z czerwoną nitką) */
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='20' fill='%23f8fafc'/%3E%3Cpath d='M35,38 A22,22 0 0,0 65,62 M65,38 A22,22 0 0,1 35,62' stroke='%23c8102e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+
+        /* Gęstość i ułożenie "posypki" */
+        background-size: 60px 60px, 50px 50px; /* Różne rozmiary dla dynamiki */
+        background-position: 0 0, 30px 30px; /* Przesunięcie dla gęstości */
+        background-repeat: repeat, repeat;
+    }
+
+    /* Przyciemnienie tła paska bocznego dla czytelności tekstu (Overlay) */
+    [data-testid="stSidebar"]::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 34, 68, 0.75); /* Półprzezroczysty Granat */
+        z-index: 0;
+    }
+    
+    /* Upewnienie się, że nav i tekst są nad obrazkami */
+    [data-testid="stSidebarNav"], [data-testid="stSidebar"] div, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+        z-index: 1;
+        position: relative;
+    }
+
+    /* Tekst w Sidebar */
+    [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
+        color: #f8fafc !important; 
+        font-family: 'Oswald', sans-serif !important;
+        font-weight: bold;
+    }
+
+    /* =========================================================
+       POZOSTAŁE STYLE (Metryki, Przyciski, itp.)
+       ========================================================= */
 
     /* Hero Cards - Styl Interstate 80 */
     .hero-card {
@@ -93,7 +136,7 @@ def init_connection():
         credentials = Credentials.from_service_account_info(
             {
                 "type": "service_account",
-                "project_id": creds.get("project_id", "budzet"),
+                "project_id": creds["project_id"],
                 "private_key": fixed_key,
                 "client_email": creds["client_email"],
                 "token_uri": creds["token_uri"],
@@ -124,7 +167,8 @@ def save_df(sheet_name, df):
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
     st.toast(f"🏈 Touchdown! Wynik zapisany: {sheet_name}!", icon="🎯")
 
-# --- NAWIGACJA ---
+# --- NAWIGACJA (PLAYBOOK) ---
+# Uwaga: Stylizacja CSS zapewnia, że te elementy są nad piłkami
 st.sidebar.markdown("<h1 style='color:white !important; font-size: 2.5rem;'>📋 PLAYBOOK</h1>", unsafe_allow_html=True)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
 wybrany_m_nazwa = st.sidebar.selectbox("Miesiąc:", miesiące, index=datetime.now().month - 1)
@@ -153,7 +197,7 @@ if menu == "🏙️ L-Train (Kokpit)":
     s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
     s_zobowiazania = zob['Kwota'].sum() if not zob.empty else 0
     
-    # KULOODPORNA TARCZA: Sprawdzamy, czy kolumna "Akcja" na pewno istnieje
+    # Warstwa ochronna: Sprawdzamy, czy kolumna "Akcja" na pewno istnieje
     w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if (not osz_m.empty and 'Akcja' in osz_m.columns) else 0
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
@@ -174,6 +218,7 @@ if menu == "🏙️ L-Train (Kokpit)":
         st.markdown(f"<div class='{klasa}'><p>LIMIT NA DZIEŃ ({pozostalo_dni} DNI)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
 
     st.write("---")
+    # Columns na telefonie ułożą się pionowo
     col1, col2, col3 = st.columns(3)
     col1.metric("Wpływy", f"{s_prz:,.2f} zł")
     col2.metric("Stałe koszty", f"{s_zobowiazania:,.2f} zł")
@@ -189,6 +234,7 @@ elif menu == "🛒 Zakupy (Codzienne)":
         if st.form_submit_button("🏈 ZAPISZ WYDATEK"):
             if k > 0 and n:
                 teraz = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # Kategoria "Codzienne" wpisana z automatu
                 sh.worksheet("Wydatki").append_row([teraz, n, "Codzienne", k])
                 st.rerun()
 
@@ -220,7 +266,7 @@ elif menu == "📥 Wpływy":
     with st.form("add_p", clear_on_submit=True):
         c1, c2 = st.columns(2)
         z = c1.text_input("Źródło")
-        kw = c2.number_input("Kwota", min_value=0.0)
+        kw = c2.number_input("Kwota")
         if st.form_submit_button("💰 Dodaj wpływ"):
             if z and kw > 0:
                 sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
@@ -235,7 +281,7 @@ elif menu == "🌽 Sejf":
     with st.form("add_o", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         cl = c1.text_input("Cel")
-        kwo = c2.number_input("Kwota", min_value=0.0)
+        kwo = c2.number_input("Kwota")
         ak = c3.selectbox("Akcja", ["Wpłata", "Wypłata"])
         if st.form_submit_button("🏦 Zamknij sejf"):
             if cl and kwo > 0:
