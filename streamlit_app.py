@@ -14,7 +14,7 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
     /* =========================================================
-       ZABÓJCA BIAŁEGO PASKA (100% Przezroczystości Headera)
+       PRZEZROCZYSTY HEADER (BEZ BIAŁEGO PASKA)
        ========================================================= */
     [data-testid="stHeader"], header, .stAppHeader {
         background-color: transparent !important;
@@ -22,17 +22,36 @@ st.markdown("""
         box-shadow: none !important;
     }
     
-    /* Ukrycie prawego menu (Deploy, 3 kropki), zostaje tylko Hamburger Menu po lewej */
-    [data-testid="stToolbar"] {
-        display: none !important;
-    }
-    
+    /* Ukrycie prawego menu (Deploy, 3 kropki) */
+    [data-testid="stToolbar"] { display: none !important; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
     
-    .block-container {
-        padding-top: 2rem !important; /* Mniejsze światło na górze */
+    .block-container { padding-top: 2rem !important; }
+
+    /* =========================================================
+       JASKRAWY PRZYCISK MENU NA TELEFONY (HAMBURGER)
+       ========================================================= */
+    [data-testid="collapsedControl"] {
+        background-color: #c83803 !important; /* Bears Orange */
+        border: 2px solid #ffffff !important;
+        border-radius: 8px !important;
+        margin-top: 10px !important;
+        margin-left: 10px !important;
+        padding: 5px !important;
+        z-index: 999999 !important; /* Zawsze na wierzchu */
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.8) !important;
+        transition: transform 0.2s;
+    }
+    [data-testid="collapsedControl"]:hover {
+        transform: scale(1.1);
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: #ffffff !important; /* Biała ikona */
+        color: #ffffff !important;
+        width: 25px !important;
+        height: 25px !important;
     }
 
     /* =========================================================
