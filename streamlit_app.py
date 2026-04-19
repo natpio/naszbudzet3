@@ -2,7 +2,8 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Nasz Budżet PRO", page_icon="💎", layout="wide")
@@ -49,6 +50,20 @@ st.markdown("""
         transform: scale(1.02);
         box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
     }
+    /* Podświetlenie dziennego limitu */
+    .daily-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white; 
+        padding: 25px; 
+        border-radius: 20px;
+        text-align: center; 
+        margin-bottom: 20px; 
+        box-shadow: 0 10px 20px rgba(118, 75, 162, 0.3);
+    }
+    .daily-box.highlight {
+        background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+        box-shadow: 0 10px 20px rgba(0, 114, 255, 0.3);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -94,7 +109,6 @@ def save_df(sheet_name, df):
         sheet = sh.worksheet(sheet_name)
         sheet.clear()
         df_to_save = df.copy()
-        # Formatowanie dat z powrotem na tekst przed zapisem
         for col in df_to_save.select_dtypes(include=['datetime64']).columns:
             df_to_save[col] = df_to_save[col].dt.strftime('%Y-%m-%d')
         sheet.update([df_to_save.columns.values.tolist()] + df_to_save.fillna("").values.tolist())
@@ -106,20 +120,17 @@ def save_df(sheet_name, df):
 def run_monthly_billing(month_date):
     wydatki_df = load_df("Wydatki")
     
-    # TARCZA: Jeśli arkusz jest pusty lub brakuje nagłówków, przerywamy automat
     if wydatki_df.empty or 'Data' not in wydatki_df.columns or 'Data końca' not in wydatki_df.columns:
         return
         
     month_str = month_date.strftime("%Y-%m")
     
-    # Sprawdzenie czy już naliczono automat w tym miesiącu
     already_billed = wydatki_df[
         (wydatki_df['Data'].dt.strftime("%Y-%m") == month_str) & 
         (wydatki_df['Nazwa'].astype(str).str.contains("AUTOMAT:"))
     ]
     
     if already_billed.empty:
-        # Znalezienie aktywnych subskrypcji i kosztów stałych
         aktywne = wydatki_df[
             ((wydatki_df['Typ'].astype(str).str.contains("Stały")) | (wydatki_df['Kategoria'] == "Subskrypcje")) &
             (wydatki_df['Data'] < month_date) &
@@ -143,7 +154,7 @@ def run_monthly_billing(month_date):
 
 # --- SIDEBAR & NAWIGACJA ---
 st.sidebar.markdown("## 💎 Nasze Centrum")
-selected_month = st.sidebar.date_input("Wybierz miesiąc do analizy", datetime.now().replace(day=1))
+selected_month = st.sidebar.date_input("Wybierz miesiąc do analizy", date.today().replace(day=1))
 run_monthly_billing(selected_month)
 st.sidebar.markdown("---")
 menu = st.sidebar.radio("Nawigacja:", ["🏠 Kokpit", "📥 Wpływy", "💸 Wydatki", "📅 Raty", "🐷 Oszczędności"])
@@ -155,46 +166,75 @@ def filter_month(df):
 # --- WIDOKI ---
 if menu == "🏠 Kokpit":
     st.markdown(f"<h1>Bilans: {selected_month.strftime('%B %Y')} ☕</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #7f8c8d; font-size: 1.1rem;'>Witajcie! Oto podsumowanie Waszego budżetu w wybranym miesiącu.</p>", unsafe_allow_html=True)
     
-    prz = filter_month(load_df("Przychody"))
-    wyd = filter_month(load_df("Wydatki"))
+    prz_m = filter_month(load_df("Przychody"))
+    wyd_m = filter_month(load_df("Wydatki"))
+    osz_m = filter_month(load_df("Oszczednosci"))
     raty = load_df("Raty")
-    osz = load_df("Oszczednosci")
+    osz_all = load_df("Oszczednosci")
     
-    total_in = prz['Kwota'].sum() if not prz.empty else 0
-    total_out = wyd['Kwota'].sum() if not wyd.empty else 0
-    total_raty = pd.to_numeric(raty['Kwota raty'], errors='coerce').sum() if not raty.empty else 0
+    # Obliczenia miesięczne
+    suma_wplywow = prz_m['Kwota'].sum() if not prz_m.empty else 0
+    suma_wydatkow = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
+    suma_rat = pd.to_numeric(raty['Kwota raty'], errors='coerce').sum() if not raty.empty else 0
+    wplaty_osz_m = osz_m[osz_m['Typ'] == 'Wpłata']['Kwota'].sum() if not osz_m.empty and 'Typ' in osz_m.columns else 0
     
-    # Obliczanie stanu oszczędności
-    if not osz.empty and 'Typ' in osz.columns and 'Kwota' in osz.columns:
-        wplaty = pd.to_numeric(osz[osz['Typ'] == 'Wpłata']['Kwota'], errors='coerce').sum()
-        wyplaty = pd.to_numeric(osz[osz['Typ'] == 'Wypłata']['Kwota'], errors='coerce').sum()
-        total_savings = wplaty - wyplaty
+    # Wolne środki = Wpływy - Wydatki - Raty - Wpłaty na oszczędności (w tym miesiącu)
+    do_konca_miesiaca = suma_wplywow - suma_wydatkow - suma_rat - wplaty_osz_m
+    
+    # Obliczenia całkowitych oszczędności (historycznie)
+    if not osz_all.empty and 'Typ' in osz_all.columns:
+        total_savings = osz_all[osz_all['Typ'] == 'Wpłata']['Kwota'].sum() - osz_all[osz_all['Typ'] == 'Wypłata']['Kwota'].sum()
     else:
         total_savings = 0
-        
-    zostaje = total_in - total_out - total_raty
-    
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Wpływy", f"{total_in:,.2f} zł")
-    c2.metric("Wydatki", f"{total_out:,.2f} zł")
-    c3.metric("Raty stałe", f"{total_raty:,.2f} zł")
-    c4.metric("Wolne Środki", f"{zostaje:,.2f} zł")
+
+    # Obliczanie Dni
+    dzis = date.today()
+    if dzis.month == selected_month.month and dzis.year == selected_month.year:
+        dni_w_miesiacu = calendar.monthrange(dzis.year, dzis.month)[1]
+        pozostalo_dni = dni_w_miesiacu - dzis.day + 1
+    else:
+        pozostalo_dni = calendar.monthrange(selected_month.year, selected_month.month)[1]
+
+    dzienna_stawka = do_konca_miesiaca / pozostalo_dni if pozostalo_dni > 0 and do_konca_miesiaca > 0 else 0
+
+    # Sekcja Licznika Dziennego
+    st.write("### Wskaźniki przetrwania")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"""
+            <div class='daily-box'>
+                <p style='margin:0; font-size: 1.1rem; opacity: 0.9;'>Zostało na koncie (na życie)</p>
+                <h2 style='margin:0; font-size: 3.5rem; font-weight: 800;'>{do_konca_miesiaca:,.2f} zł</h2>
+            </div>
+        """, unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+            <div class='daily-box highlight'>
+                <p style='margin:0; font-size: 1.1rem; opacity: 0.9;'>Bezpieczny limit na dziś (przez {pozostalo_dni} dni)</p>
+                <h2 style='margin:0; font-size: 3.5rem; font-weight: 800;'>{dzienna_stawka:,.2f} zł</h2>
+            </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.subheader(f"🐷 Aktualny Fundusz Oszczędnościowy: {total_savings:,.2f} zł")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Łączne Wpływy", f"{suma_wplywow:,.2f} zł")
+    col2.metric("Wydatki + Raty", f"{(suma_wydatkow + suma_rat):,.2f} zł")
+    col3.metric("Wysłano na 🐷 w tym m-cu", f"{wplaty_osz_m:,.2f} zł")
+
+    st.markdown("---")
+    st.markdown(f"### 🐷 Nasz Fundusz Całkowity: **<span style='color:#27ae60;'>{total_savings:,.2f} zł</span>**", unsafe_allow_html=True)
     
     colA, colB = st.columns(2)
     with colA:
-        if not wyd.empty:
+        if not wyd_m.empty:
             st.write("#### Na co poszły pieniądze?")
-            wydatki_kat = wyd.groupby("Kategoria")["Kwota"].sum().reset_index()
+            wydatki_kat = wyd_m.groupby("Kategoria")["Kwota"].sum().reset_index()
             st.bar_chart(wydatki_kat, x="Kategoria", y="Kwota", color="#ff7675")
     with colB:
-        if not prz.empty:
+        if not prz_m.empty:
             st.write("#### Gdzie są nasze środki?")
-            kasa = prz.groupby("Typ")["Kwota"].sum().reset_index()
+            kasa = prz_m.groupby("Typ")["Kwota"].sum().reset_index()
             st.bar_chart(kasa, x="Typ", y="Kwota", color="#74b9ff")
 
 elif menu == "📥 Wpływy":
