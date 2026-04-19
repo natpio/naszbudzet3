@@ -6,114 +6,131 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Diner Budget", page_icon="🍔", layout="wide")
+st.set_page_config(page_title="Route 66 Budget", page_icon="🍔", layout="wide")
 
-# --- STYLIZACJA AMERICAN DINER 50s ---
+# --- STYLIZACJA: PEŁNY AMERICAN DINER 50s ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Lobster&family=Inter:wght@400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Bungee+Inline&family=Pacifico&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
-    /* Tło aplikacji - czarno-biała szachownica */
+    /* Tło - Różowo-Czarna Szachownica (Klasyk!) */
     .stApp {
-        background-color: #ffffff;
+        background-color: #ffc2d1;
         background-image:
-          linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a),
-          linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
+          linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111),
+          linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111);
         background-size: 60px 60px;
         background-position: 0 0, 30px 30px;
         background-attachment: fixed;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Space Mono', monospace;
     }
 
-    /* Główny kontener - Karta z Menu (kremowa jak milkshake waniliowy) */
+    /* Karta Menu - Główny kontener aplikacji */
     [data-testid="block-container"] {
-        background-color: #fffdf5; 
+        background-color: #fffdf5; /* Kremowy papier */
         padding: 40px;
-        border-radius: 15px;
-        border: 5px solid #d90429;
-        box-shadow: 12px 12px 0px #1a1a1a;
+        border-radius: 20px;
+        border: 8px dashed #d90429; /* Ramka jak w menu */
+        box-shadow: 15px 15px 0px rgba(0,0,0,0.9);
         margin-top: 2rem;
         margin-bottom: 2rem;
     }
 
-    /* Nagłówki - Neonowy Lobster */
-    h1, h2, h3 {
-        font-family: 'Lobster', cursive !important;
-        color: #d90429 !important;
-        text-shadow: 2px 2px 0px #1a1a1a;
-        letter-spacing: 2px;
+    /* Różowe Neony dla Nagłówków */
+    h1, h2 {
+        font-family: 'Bungee Inline', cursive !important;
+        color: #ff0055 !important;
+        text-shadow: 0 0 5px #ff0055, 0 0 10px #ff0055, 0 0 20px #ff0055;
+        text-align: center;
+        letter-spacing: 3px;
+        margin-bottom: 1rem;
+    }
+    h3 {
+        font-family: 'Pacifico', cursive !important;
+        color: #03045e !important;
+        font-size: 2rem !important;
     }
 
-    /* Pasek boczny - Czerwony plastik / skóra */
+    /* Pasek boczny - Szafa Grająca (Jukebox) */
     [data-testid="stSidebar"] {
-        background-color: #d90429;
-        background-image: linear-gradient(0deg, #961216 0%, #d90429 100%);
-        border-right: 5px solid #1a1a1a;
+        background: linear-gradient(180deg, #d90429 0%, #8a0c10 100%);
+        border-right: 8px solid #ffb703; /* Musztardowa lamówka */
     }
-    
-    /* Napisy w pasku bocznym */
     [data-testid="stSidebarNav"], [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
         color: #fffdf5 !important;
-        font-weight: bold;
+        font-family: 'Space Mono', monospace;
+        font-size: 1.1rem;
     }
 
-    /* Karty Metryk i Hero - Czerwona Skórzana Loża z Chromem */
-    div[data-testid="metric-container"], .hero-card {
-        background: linear-gradient(to bottom, #bd1e24 0%, #8a0c10 100%);
-        border: 4px solid #e2e8f0; /* Chrom */
-        border-radius: 12px;
+    /* Metryki - Klasyczna Kasa Fiskalna */
+    div[data-testid="metric-container"] {
+        background-color: #1a1a1a;
+        border: 4px solid #8d99ae; /* Chromowana obudowa */
+        border-radius: 10px;
         padding: 20px;
-        box-shadow: inset 0px 5px 15px rgba(0,0,0,0.5), 5px 5px 0px #1a1a1a;
+        box-shadow: inset 0px 0px 15px rgba(0,0,0,1), 5px 5px 0px #d90429;
         text-align: center;
     }
-
-    /* Wartości w kartach metryk */
     [data-testid="stMetricValue"] {
-        color: #fffdf5 !important;
-        font-family: 'Lobster', cursive !important;
-        text-shadow: 2px 2px 4px #000;
+        font-family: 'Space Mono', monospace !important;
+        color: #39ff14 !important; /* Świecąca zieleń */
+        text-shadow: 0 0 8px #39ff14;
         font-size: 2.5rem !important;
     }
     [data-testid="stMetricLabel"] {
-        color: #ffb703 !important; /* Musztardowy żółty */
-        font-weight: 900 !important;
-        text-transform: uppercase;
+        color: #fffdf5 !important;
+        font-family: 'Pacifico', cursive !important;
+        font-size: 1.2rem !important;
     }
 
-    /* Stylizacja Hero Cards */
+    /* Tarcze Główne (Hero Cards) - Neonowy Szyld */
+    .hero-card {
+        background: #111;
+        border: 4px solid #00f5d4; /* Turkusowy neon */
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 0 15px #00f5d4, inset 0 0 20px #00f5d4;
+        text-align: center;
+    }
     .hero-card h2 {
-        color: #fffdf5 !important;
+        color: #00f5d4 !important;
+        text-shadow: 0 0 10px #00f5d4;
         font-size: 3.5rem !important;
         margin: 10px 0;
+        font-family: 'Space Mono', monospace !important;
     }
     .hero-card p {
-        color: #ffb703 !important;
-        font-weight: 900;
-        text-transform: uppercase;
-        margin:0;
-        font-size: 1.1rem;
+        color: #fffdf5 !important;
+        font-family: 'Pacifico', cursive !important;
+        font-size: 1.5rem;
+        margin: 0;
     }
 
-    /* Przyciski - Retro Musztarda z grubym czarnym cieniem */
+    /* Przyciski - Grube, musztardowe klawisze kasy */
     .stButton>button {
         background-color: #ffb703;
         color: #1a1a1a !important;
-        border: 3px solid #1a1a1a;
-        border-radius: 8px;
+        border: 4px solid #1a1a1a;
+        border-radius: 12px;
         font-weight: 900;
-        font-size: 1.1rem;
+        font-family: 'Space Mono', monospace;
+        font-size: 1.2rem;
         text-transform: uppercase;
-        box-shadow: 5px 5px 0px #1a1a1a;
+        box-shadow: 6px 6px 0px #1a1a1a;
         transition: all 0.1s;
     }
     .stButton>button:hover {
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #1a1a1a;
+        transform: translate(3px, 3px);
+        box-shadow: 3px 3px 0px #1a1a1a;
         background-color: #fb8500;
     }
-    
-    /* Ukrycie indexu tabel dla czystszego widoku */
-    .stDataFrame { border: 2px solid #1a1a1a; border-radius: 8px; }
+
+    /* Tabele (żeby było widać na kremowym tle) */
+    .stDataFrame {
+        border: 3px solid #1a1a1a;
+        border-radius: 5px;
+        background-color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -124,18 +141,13 @@ def init_connection():
         creds = st.secrets["connections"]["gsheets"]
         fixed_key = creds["private_key"].replace("\\n", "\n").strip()
         credentials = Credentials.from_service_account_info(
-            {
-                "type": "service_account",
-                "project_id": creds.get("project_id", "budzet"),
-                "private_key": fixed_key,
-                "client_email": creds["client_email"],
-                "token_uri": creds["token_uri"],
-            },
+            {"type": "service_account", "project_id": creds.get("project_id", "budzet"),
+             "private_key": fixed_key, "client_email": creds["client_email"], "token_uri": creds["token_uri"]},
             scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         )
         return gspread.authorize(credentials).open_by_url(creds["spreadsheet"])
     except Exception as e:
-        st.error(f"Błąd połączenia: {e}")
+        st.error(f"Błąd silnika: {e}")
         return None
 
 sh = init_connection()
@@ -148,33 +160,37 @@ def load_df(sheet_name):
         if not df.empty and 'Data' in df.columns:
             df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
         return df
-    except: 
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 def save_df(sheet_name, df):
     sheet = sh.worksheet(sheet_name)
     sheet.clear()
     df_save = df.copy()
-    if 'Data' in df_save.columns:
-        df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    if 'Data' in df_save.columns: df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
-    st.toast(f"🍒 Zaktualizowano szafę grającą: {sheet_name}!")
+    st.toast(f"🍒 Bim Bam! Zapisano na taśmie: {sheet_name}!")
 
-# --- NAWIGACJA BOCZNA ---
-st.sidebar.markdown("<h2 style='color:white !important; text-shadow:none;'>🍔 Diner Menu</h2>", unsafe_allow_html=True)
+# --- MENU BOCZNE (SZAFA GRAJĄCA) ---
+st.sidebar.markdown("<h1 style='color:#ffb703 !important; text-shadow: 2px 2px 0 #1a1a1a;'>📻 Jukebox Menu</h1>", unsafe_allow_html=True)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
-wybrany_m = st.sidebar.selectbox("Wybierz Miesiąc:", miesiące, index=datetime.now().month - 1)
-wybrany_rok = st.sidebar.selectbox("Wybierz Rok:", [2024, 2025, 2026], index=2)
+wybrany_m = st.sidebar.selectbox("Wybierz Miesiąc (Strona A):", miesiące, index=datetime.now().month - 1)
+wybrany_rok = st.sidebar.selectbox("Wybierz Rok (Strona B):", [2024, 2025, 2026], index=2)
 
 m_idx = miesiące.index(wybrany_m) + 1
 selected_date = date(wybrany_rok, m_idx, 1)
 
 st.sidebar.markdown("---")
-menu = st.sidebar.radio("Co podać?", ["🏠 Kasa Główna (Kokpit)", "🍟 Zamówienia (Wydatki)", "🗓️ Rachunki za Lokal (Stałe)", "💵 Utarg (Przychody)", "🎸 Jukebox (Oszczędności)"])
+menu = st.sidebar.radio("Wybierz kawałek:", [
+    "🍔 Drive-In (Kokpit)", 
+    "🍟 Szybkie Zamówienia (Wydatki)", 
+    "🧾 Opłaty za Lokal (Stałe)", 
+    "💵 Kasa Fiskalna (Przychody)", 
+    "🎸 Szafa Grająca (Oszczędności)"
+])
 
 # --- WIDOKI ---
-if menu == "🏠 Kasa Główna (Kokpit)":
-    st.title(f"Zestawienie: {wybrany_m} {wybrany_rok} 🥤")
+if menu == "🍔 Drive-In (Kokpit)":
+    st.markdown(f"<h1>Zestawienie: {wybrany_m} {wybrany_rok} 🥤</h1>", unsafe_allow_html=True)
     
     prz = load_df("Przychody")
     wyd_c = load_df("Wydatki")
@@ -197,62 +213,65 @@ if menu == "🏠 Kasa Główna (Kokpit)":
     dzis = date.today()
     if dzis.month == m_idx and dzis.year == wybrany_rok:
         pozostalo_dni = ostatni_dzien - dzis.day + 1
-    elif selected_date < dzis:
-        pozostalo_dni = 0
-    else:
-        pozostalo_dni = ostatni_dzien
+    elif selected_date < dzis: pozostalo_dni = 0
+    else: pozostalo_dni = ostatni_dzien
         
     dniowka = wolne / pozostalo_dni if pozostalo_dni > 0 and wolne > 0 else 0
 
     c_h1, c_h2 = st.columns(2)
     with c_h1:
-        st.markdown(f"<div class='hero-card'><p>Zostało w kasie (na życie)</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='hero-card'><p>Zostało na burgery i paliwo</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
     with c_h2:
-        st.markdown(f"<div class='hero-card'><p>Dniówka na szejki ({pozostalo_dni} dni)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
+        kolor_neonu = "#ff0055" if dniowka < 50 else "#00f5d4" # Zmienia kolor na czerwony, gdy krucho z kasą
+        st.markdown(f"""
+        <div class='hero-card' style='border-color:{kolor_neonu}; box-shadow: 0 0 15px {kolor_neonu}, inset 0 0 20px {kolor_neonu};'>
+            <p>Dniówka na frytki (przez {pozostalo_dni} dni)</p>
+            <h2 style='color:{kolor_neonu} !important; text-shadow: 0 0 10px {kolor_neonu};'>{dniowka:,.2f} zł</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.write("---")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Łączny Utarg", f"{s_prz:,.2f} zł")
-    col2.metric("Opłaty za lokal", f"{s_zobowiazania:,.2f} zł")
-    col3.metric("Dzisiejsze frytki", f"{s_codzienne:,.2f} zł")
-    col4.metric("Wrzucono do szafy", f"{w_osz:,.2f} zł")
+    col1.metric("Wpadło do Kasy", f"{s_prz:,.2f} zł")
+    col2.metric("Opłaty za Lokal", f"{s_zobowiazania:,.2f} zł")
+    col3.metric("Wydano na Mieście", f"{s_codzienne:,.2f} zł")
+    col4.metric("Wrzucono do Szafy", f"{w_osz:,.2f} zł")
 
-elif menu == "🍟 Zamówienia (Wydatki)":
-    st.title("🍟 Zamówienia na wynos (Wydatki)")
-    st.info("Kasa rejestruje datę i godzinę automatycznie! Wpisz tylko kwotę.")
+elif menu == "🍟 Szybkie Zamówienia (Wydatki)":
+    st.markdown("<h1>🍟 Nabijamy Paragon!</h1>", unsafe_allow_html=True)
+    st.write("### Data nabija się sama. Ty wpisujesz tylko co zjedliśmy!")
     
     with st.form("quick_add", clear_on_submit=True):
         c1, c2, c3 = st.columns([2,1,1])
-        nazwa = c1.text_input("Co było na rachunku?")
-        kwota = c2.number_input("Kwota", min_value=0.0, step=5.0)
-        kat = c3.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Zdrowie", "Rozrywka", "Inne"])
-        if st.form_submit_button("⚡ ZAPISZ PARAGON"):
+        nazwa = c1.text_input("Co było grane?")
+        kwota = c2.number_input("Ile to kosztowało? (zł)", min_value=0.0, step=1.0)
+        kat = c3.selectbox("Menu Dział", ["Jedzenie", "Auto & Paliwo", "Rozrywka", "Dom", "Zdrowie", "Inne Bzdury"])
+        if st.form_submit_button("🛎️ DING! ZAPISZ PARAGON"):
             if kwota > 0 and nazwa:
                 teraz = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 sh.worksheet("Wydatki").append_row([teraz, nazwa, kat, kwota])
-                st.success("Zamówienie przyjęte!")
+                st.success("Wysłane do kuchni!")
                 st.rerun()
 
     df_w = load_df("Wydatki")
     if not df_w.empty:
-        st.write("### Ostatnie paragony z kasy")
+        st.write("### Ostatnie Rolki z Kasy (Historia)")
         ed_w = st.data_editor(df_w.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
-        if st.button("💾 Zapisz poprawki w księdze"): 
-            save_df("Wydatki", ed_w)
+        if st.button("💾 Zatwierdź korektę paragonów"): save_df("Wydatki", ed_w)
 
-elif menu == "🗓️ Rachunki za Lokal (Stałe)":
-    st.title("🗓️ Rachunki za Lokal (Zobowiązania)")
-    st.markdown("Czynsz, dostawcy, raty. Opłaty stałe, które pobierają się same co miesiąc.")
+elif menu == "🧾 Opłaty za Lokal (Stałe)":
+    st.markdown("<h1>🧾 Rachunki i Czynsze</h1>", unsafe_allow_html=True)
+    st.write("### Twardy biznes. Cennik rzeczy, które płacimy co miesiąc.")
     
-    t1, t2 = st.tabs(["📋 Baza opłat", "➕ Nowa umowa"])
+    t1, t2 = st.tabs(["📋 Nasze Zobowiązania", "📝 Podpisz nowy weksel"])
     
     with t2:
         with st.form("add_zob", clear_on_submit=True):
             c1, c2 = st.columns(2)
-            n = c1.text_input("Nazwa dostawcy (np. Netflix, Prąd, Rata)")
-            k = c2.number_input("Kwota stała", min_value=0.0)
-            typ = st.selectbox("Typ", ["Subskrypcja", "Koszt Stały", "Rata Kredytu"])
-            if st.form_submit_button("Podpisz umowę"):
+            n = c1.text_input("Komu płacimy? (np. Netflix, Czynsz)")
+            k = c2.number_input("Ile co miesiąc?", min_value=0.0)
+            typ = st.selectbox("Typ rachunku", ["Subskrypcja (Kino/Muzyka)", "Koszt Stały (Rachunki)", "Rata za Cadillaca (Kredyt)"])
+            if st.form_submit_button("Pieczętuj umowę"):
                 if n and k > 0:
                     sh.worksheet("Zobowiazania").append_row([n, typ, k])
                     st.rerun()
@@ -261,44 +280,44 @@ elif menu == "🗓️ Rachunki za Lokal (Stałe)":
         df_z = load_df("Zobowiazania")
         if not df_z.empty:
             ed_z = st.data_editor(df_z, hide_index=True, num_rows="dynamic", use_container_width=True)
-            if st.button("💾 Zaktualizuj rejestr stały"): 
-                save_df("Zobowiazania", ed_z)
+            if st.button("💾 Zaktualizuj Zeszyt Dłużników"): save_df("Zobowiazania", ed_z)
 
-elif menu == "💵 Utarg (Przychody)":
-    st.title("💵 Dzisiejszy Utarg (Przychody)")
+elif menu == "💵 Kasa Fiskalna (Przychody)":
+    st.markdown("<h1>💵 Kasa Fiskalna</h1>", unsafe_allow_html=True)
+    st.write("### Wypłaty, Napiwki, Kasa ze sprzedaży starych płyt.")
     with st.form("add_prz", clear_on_submit=True):
         c1, c2 = st.columns(2)
-        zrodlo = c1.text_input("Skąd ten hajs? (np. Pensja)")
-        kwota = c2.number_input("Ile zarobiliśmy?", min_value=0.0)
-        forma = st.selectbox("Forma zapłaty", ["Konto", "Gotówka w kasie"])
-        if st.form_submit_button("Wrzuć do kasy"):
+        zrodlo = c1.text_input("Kto płaci? (np. Szef, Klient)")
+        kwota = c2.number_input("Ile hajsu?", min_value=0.0)
+        forma = st.selectbox("Forma zapłaty", ["Przelew na konto", "Zielone w gotówce"])
+        if st.form_submit_button("Otwórz Szufladę i Włóż Kasę"):
             if zrodlo and kwota > 0:
                 sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), zrodlo, forma, kwota])
                 st.rerun()
 
     df_p = load_df("Przychody")
     if not df_p.empty:
-        st.write("### Historia księgowa")
+        st.write("### Księga Główna (Historia Wpływów)")
         ed_p = st.data_editor(df_p.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Nadpisz księgi"): 
-            save_df("Przychody", ed_p)
+        if st.button("💾 Zamknij Księgi"): save_df("Przychody", ed_p)
 
-elif menu == "🎸 Jukebox (Oszczędności)":
-    st.title("🎸 Jukebox (Oszczędności)")
-    st.markdown("Wrzuć monetę do szafy na lepsze czasy!")
+elif menu == "🎸 Szafa Grająca (Oszczędności)":
+    st.markdown("<h1>🎸 Jukebox: Oszczędności</h1>", unsafe_allow_html=True)
+    st.write("### Wrzuć monetę na lepsze czasy albo zbieraj na nowego Cadillaca!")
     with st.form("add_osz", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
-        cel = c1.text_input("Na jaki cel?")
-        kwota = c2.number_input("Ile wrzucasz?", min_value=0.0)
-        akcja = c3.selectbox("Rodzaj operacji", ["Wpłata", "Wypłata"])
-        if st.form_submit_button("Wciśnij przycisk Play"):
+        cel = c1.text_input("Na co zbieramy?")
+        kwota = c2.number_input("Ile wrzucamy?", min_value=0.0)
+        akcja = c3.selectbox("Co robimy?", ["Wpłata (Wrzuć monetę)", "Wypłata (Rozbijamy świnkę)"])
+        if st.form_submit_button("🎵 Wciśnij Play (Zapisz)"):
             if cel and kwota > 0:
-                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cel, kwota, akcja])
+                # Zamieniamy długie opcje na proste słowa do kalkulacji
+                czysta_akcja = "Wpłata" if "Wpłata" in akcja else "Wypłata"
+                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cel, kwota, czysta_akcja])
                 st.rerun()
 
     df_o = load_df("Oszczednosci")
     if not df_o.empty:
-        st.write("### Rozbita skarbonka")
+        st.write("### Historia Wrzutek")
         ed_o = st.data_editor(df_o.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Zabezpiecz szafę grającą"): 
-            save_df("Oszczednosci", ed_o)
+        if st.button("💾 Zarygluj Szafę Grającą"): save_df("Oszczednosci", ed_o)
