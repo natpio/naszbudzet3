@@ -152,7 +152,9 @@ if menu == "🏙️ L-Train (Kokpit)":
     s_prz = prz_m['Kwota'].sum() if not prz_m.empty else 0
     s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
     s_zobowiazania = zob['Kwota'].sum() if not zob.empty else 0
-    w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if not osz_m.empty else 0
+    
+    # KULOODPORNA TARCZA: Sprawdzamy, czy kolumna "Akcja" na pewno istnieje
+    w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if (not osz_m.empty and 'Akcja' in osz_m.columns) else 0
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
     
