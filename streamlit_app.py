@@ -6,14 +6,29 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide")
+st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="collapsed")
 
-# --- STYLIZACJA: CHICAGO/DES MOINES + TWOJA TAPETA + RWD ---
+# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + INTERSTATE FIX ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
-    /* Tło z Twojego GitHuba */
+    /* =========================================================
+       UKRYCIE ZNAKÓW WODNYCH I ELEMENTÓW STREAMLIT
+       ========================================================= */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden !important;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    
+    /* Poprawka marginesu górnego po usunięciu headera */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+
+    /* =========================================================
+       TŁO GŁÓWNE
+       ========================================================= */
     .stApp {
         background-image: url('https://raw.githubusercontent.com/natpio/naszbudzet3/refs/heads/main/1776619317829.jpg');
         background-size: cover;
@@ -22,104 +37,99 @@ st.markdown("""
         font-family: 'Roboto', sans-serif;
     }
     
-    /* Warstwa przyciemniająca tło dla czytelności */
     .stApp::before {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(26, 37, 44, 0.88);
-        z-index: -1;
+        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(26, 37, 44, 0.88); z-index: -1;
     }
 
-    /* Kontener główny */
     [data-testid="block-container"] {
         background-color: rgba(248, 250, 252, 0.95); 
-        padding: 40px;
-        border-radius: 8px;
-        border: 8px solid #0f172a;
-        box-shadow: 15px 15px 0px rgba(0,0,0,0.5);
-        margin-top: 2rem;
+        padding: 30px; border-radius: 8px; border: 8px solid #0f172a;
+        box-shadow: 15px 15px 0px rgba(0,0,0,0.6);
         margin-bottom: 2rem;
     }
 
-    /* Stylizacja Nagłówków */
+    /* Nagłówki */
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #c8102e !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #002244 !important; text-transform: uppercase; }
 
     /* =========================================================
-       PASEK BOCZNY - OBSIANY PIŁKAMI (BASEBALL & FOOTBALL)
+       PASEK BOCZNY - PIŁKI
        ========================================================= */
     [data-testid="stSidebar"] {
-        /* Bazowy kolor Chicago Bears Navy */
-        background-color: #002244; 
-        border-right: 8px solid #c83803; /* Bears Orange */
-
-        /* WZÓR PIŁEK (Encoded SVGs) */
+        background-color: #002244; border-right: 8px solid #c83803;
         background-image: 
-            /* Piłka Footballowa (Pomarańczowa Bears z białą nitką) */
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='50' rx='35' ry='20' fill='%23c83803'/%3E%3Cpath d='M30,50 h40 M50,35 v30 M42,40 v20 M58,40 v20' stroke='%23f8fafc' stroke-width='2' fill='none'/%3E%3C/svg%3E"),
-            /* Piłka Baseballowa (Biała z czerwoną nitką) */
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='20' fill='%23f8fafc'/%3E%3Cpath d='M35,38 A22,22 0 0,0 65,62 M65,38 A22,22 0 0,1 35,62' stroke='%23c8102e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-
-        /* Gęstość i ułożenie "posypki" */
-        background-size: 60px 60px, 50px 50px; /* Różne rozmiary dla dynamiki */
-        background-position: 0 0, 30px 30px; /* Przesunięcie dla gęstości */
-        background-repeat: repeat, repeat;
+        background-size: 60px 60px, 50px 50px; background-position: 0 0, 30px 30px; background-repeat: repeat, repeat;
     }
-
-    /* Przyciemnienie tła paska bocznego dla czytelności tekstu (Overlay) */
     [data-testid="stSidebar"]::before {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 34, 68, 0.75); /* Półprzezroczysty Granat */
-        z-index: 0;
+        content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 34, 68, 0.85); z-index: 0;
     }
-    
-    /* Upewnienie się, że nav i tekst są nad obrazkami */
-    [data-testid="stSidebarNav"], [data-testid="stSidebar"] div, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
-        z-index: 1;
-        position: relative;
-    }
-
-    /* Tekst w Sidebar */
-    [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
-        color: #f8fafc !important; 
-        font-family: 'Oswald', sans-serif !important;
-        font-weight: bold;
-    }
+    [data-testid="stSidebarNav"], [data-testid="stSidebar"] div, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { z-index: 1; position: relative; }
+    [data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label { color: #f8fafc !important; font-family: 'Oswald', sans-serif !important; font-weight: bold; }
 
     /* =========================================================
-       POZOSTAŁE STYLE (Metryki, Przyciski, itp.)
+       HERO CARDS (Główne Liczniki)
        ========================================================= */
-
-    /* Hero Cards - Styl Interstate 80 */
+    /* Karta Zielona (Autostrada ogólna) */
     .hero-card {
         background-color: #006b3d; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; 
         box-shadow: 0 10px 20px rgba(0,0,0,0.4); text-align: center; color: white; margin-bottom: 20px;
     }
-    .hero-card.danger { background-color: #c8102e; }
-    .hero-card h2 { color: #ffffff !important; font-size: 3.5rem !important; margin: 5px 0; text-shadow: none; }
-    .hero-card p { font-weight: 900; font-size: 1.2rem; text-transform: uppercase; margin: 0; }
+    
+    /* KARTA INTERSTATE 80 (Limit Dzienny) */
+    .hero-card.interstate {
+        background-color: #003882; /* Niebieski ze znaku drogowego */
+        border: 4px solid #ffffff;
+        border-top: 15px solid #c8102e; /* Czerwony pasek na górze znaku */
+        border-radius: 12px; padding: 20px; 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 20px;
+    }
+    
+    /* Karta Alarmowa */
+    .hero-card.danger { background-color: #c8102e; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; text-align: center; color: white; margin-bottom: 20px; }
 
-    /* Metryki */
-    div[data-testid="metric-container"] { background-color: #111; border: 3px solid #333; border-radius: 8px; padding: 15px; text-align: center; }
-    [data-testid="stMetricValue"] { font-family: 'Bebas Neue' !important; color: #ffb612 !important; font-size: 2.5rem !important; }
-    [data-testid="stMetricLabel"] { color: #fff !important; font-weight: 700 !important; text-transform: uppercase; }
+    .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3.5rem !important; margin: 5px 0; text-shadow: none; font-family: 'Bebas Neue', cursive !important; }
+    .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1.2rem; text-transform: uppercase; margin: 0; font-family: 'Roboto', sans-serif !important; }
 
-    /* Przycisk - Masywny i sportowy */
+    /* =========================================================
+       NAPRAWA METRYK (Wpływy, Koszty, Odkłożono)
+       ========================================================= */
+    [data-testid="stMetric"] { 
+        background-color: rgba(17, 34, 68, 0.95) !important; /* Ciemny granat */
+        border: 3px solid #c83803 !important; /* Pomarańczowa ramka Bears */
+        border-radius: 12px !important; 
+        padding: 15px !important; 
+        text-align: center !important; 
+        box-shadow: 0 8px 15px rgba(0,0,0,0.8) !important; 
+    }
+    [data-testid="stMetricValue"] div { 
+        font-family: 'Bebas Neue', cursive !important; 
+        color: #ffb612 !important; /* Żółty z Des Moines */
+        font-size: 2.5rem !important; 
+        text-shadow: 2px 2px 4px black !important;
+    }
+    [data-testid="stMetricLabel"] p { 
+        color: #ffffff !important; 
+        font-weight: 700 !important; 
+        text-transform: uppercase !important; 
+        font-family: 'Roboto', sans-serif !important;
+    }
+
+    /* Przycisk */
     .stButton>button {
         background-color: #002244; color: #ffffff !important; border: 3px solid #c83803; border-radius: 4px;
         font-weight: 900; font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%;
     }
 
-    /* Ticker Tape */
     .ticker-tape { background-color: #111; color: #ffb612; font-family: 'Roboto', monospace; font-weight: bold; padding: 10px; border: 4px solid #333; font-size: 1.2rem; margin-bottom: 30px; text-transform: uppercase; }
 
-    /* --- RESPONSYWNOŚĆ (MOBILE) --- */
+    /* --- MOBILE --- */
     @media (max-width: 768px) {
-        [data-testid="block-container"] { padding: 15px !important; border-width: 4px !important; margin-top: 0.5rem !important; }
-        .hero-card h2 { font-size: 2.2rem !important; }
+        [data-testid="block-container"] { padding: 15px !important; border-width: 4px !important; margin-top: 0 !important; }
+        .hero-card h2, .hero-card.interstate h2 { font-size: 2.2rem !important; }
         h1 { font-size: 2rem !important; }
         .stButton>button { font-size: 1rem !important; height: 3.5rem !important; }
         .ticker-tape { font-size: 0.9rem !important; padding: 5px !important; }
@@ -168,7 +178,6 @@ def save_df(sheet_name, df):
     st.toast(f"🏈 Touchdown! Wynik zapisany: {sheet_name}!", icon="🎯")
 
 # --- NAWIGACJA (PLAYBOOK) ---
-# Uwaga: Stylizacja CSS zapewnia, że te elementy są nad piłkami
 st.sidebar.markdown("<h1 style='color:white !important; font-size: 2.5rem;'>📋 PLAYBOOK</h1>", unsafe_allow_html=True)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
 wybrany_m_nazwa = st.sidebar.selectbox("Miesiąc:", miesiące, index=datetime.now().month - 1)
@@ -197,7 +206,6 @@ if menu == "🏙️ L-Train (Kokpit)":
     s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
     s_zobowiazania = zob['Kwota'].sum() if not zob.empty else 0
     
-    # Warstwa ochronna: Sprawdzamy, czy kolumna "Akcja" na pewno istnieje
     w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if (not osz_m.empty and 'Akcja' in osz_m.columns) else 0
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
@@ -214,11 +222,11 @@ if menu == "🏙️ L-Train (Kokpit)":
     with c_h1:
         st.markdown(f"<div class='hero-card'><p>I-80 FUNDS (W PORTFELU)</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
     with c_h2:
-        klasa = "hero-card danger" if dniowka < 50 else "hero-card"
+        # Klasa Interstate 80 wchodzi do gry
+        klasa = "hero-card danger" if dniowka < 50 else "hero-card interstate"
         st.markdown(f"<div class='{klasa}'><p>LIMIT NA DZIEŃ ({pozostalo_dni} DNI)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
 
     st.write("---")
-    # Columns na telefonie ułożą się pionowo
     col1, col2, col3 = st.columns(3)
     col1.metric("Wpływy", f"{s_prz:,.2f} zł")
     col2.metric("Stałe koszty", f"{s_zobowiazania:,.2f} zł")
@@ -234,7 +242,6 @@ elif menu == "🛒 Zakupy (Codzienne)":
         if st.form_submit_button("🏈 ZAPISZ WYDATEK"):
             if k > 0 and n:
                 teraz = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                # Kategoria "Codzienne" wpisana z automatu
                 sh.worksheet("Wydatki").append_row([teraz, n, "Codzienne", k])
                 st.rerun()
 
@@ -266,7 +273,7 @@ elif menu == "📥 Wpływy":
     with st.form("add_p", clear_on_submit=True):
         c1, c2 = st.columns(2)
         z = c1.text_input("Źródło")
-        kw = c2.number_input("Kwota")
+        kw = c2.number_input("Kwota", min_value=0.0)
         if st.form_submit_button("💰 Dodaj wpływ"):
             if z and kw > 0:
                 sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
@@ -281,7 +288,7 @@ elif menu == "🌽 Sejf":
     with st.form("add_o", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         cl = c1.text_input("Cel")
-        kwo = c2.number_input("Kwota")
+        kwo = c2.number_input("Kwota", min_value=0.0)
         ak = c3.selectbox("Akcja", ["Wpłata", "Wypłata"])
         if st.form_submit_button("🏦 Zamknij sejf"):
             if cl and kwo > 0:
