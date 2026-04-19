@@ -4,6 +4,7 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime, date
 import calendar
+import extra_streamlit_components as stx
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Midwest Budget", page_icon="🏈", layout="centered", initial_sidebar_state="collapsed")
@@ -13,100 +14,61 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
-    /* =========================================================
-       UKRYWANIE ZBĘDNYCH RELIKTÓW STREAMLITA
-       ========================================================= */
+    /* UKRYWANIE ZBĘDNYCH RELIKTÓW STREAMLITA */
     [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none !important; }
     [data-testid="stHeader"], header, .stAppHeader { background: transparent !important; box-shadow: none !important; }
     [data-testid="stToolbar"], #MainMenu, footer, .stDeployButton { display: none !important; }
     
-    /* =========================================================
-       TŁO GŁÓWNE Z GITHUBA
-       ========================================================= */
+    /* TŁO GŁÓWNE Z GITHUBA */
     .stApp {
         background-image: url('https://raw.githubusercontent.com/natpio/naszbudzet3/refs/heads/main/1776619317829.jpg');
         background-size: cover; background-position: center; background-attachment: fixed;
         font-family: 'Roboto', sans-serif;
     }
 
-    /* =========================================================
-       GŁÓWNY KONTENER (TARCZA OCHRONNA DLA TEKSTU)
-       To rozwiązuje problem zlewających się napisów!
-       ========================================================= */
+    /* GŁÓWNY KONTENER (TARCZA OCHRONNA DLA TEKSTU) */
     [data-testid="block-container"] {
-        background-color: rgba(0, 34, 68, 0.92) !important; /* Mocny, półprzezroczysty Granat Chicago Bears */
-        padding: 30px !important;
-        border-radius: 20px;
-        border: 4px solid #c83803; /* Pomarańczowa ramka Bears */
-        margin-top: 1rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-        max-width: 800px; /* Zwęża aplikację, by wyglądała świetnie na kompie i komórce */
+        background-color: rgba(0, 34, 68, 0.92) !important; 
+        padding: 30px !important; border-radius: 20px; border: 4px solid #c83803; 
+        margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+        max-width: 800px;
     }
 
-    /* GLOBALNE KOLORY TEKSTU (Biały na ciemnym tle) */
+    /* GLOBALNE KOLORY TEKSTU */
     p, label, span, .stMarkdown p, li { color: #f8fafc !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); }
     h3 { font-family: 'Oswald', sans-serif !important; color: #ffffff !important; text-transform: uppercase; border-bottom: 2px solid #c83803; padding-bottom: 5px; margin-top: 15px; }
-
-    /* Kolor tekstu wpisywanego w pola (żeby nie był biały na białym) */
     input, select { color: #000000 !important; font-weight: bold; }
-    
-    /* Zabezpieczenie czytelności tabeli */
     [data-testid="stDataFrame"] { background-color: rgba(255, 255, 255, 0.95); border-radius: 8px; padding: 5px; }
 
-    /* =========================================================
-       NOWOCZESNA NAWIGACJA (TABS)
-       ========================================================= */
-    [data-testid="stTabs"] [data-baseweb="tab-list"] {
-        background-color: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px;
-    }
-    [data-testid="stTabs"] [data-baseweb="tab"] {
-        color: #e2e8f0; font-family: 'Oswald', sans-serif !important; font-size: 1rem; border-radius: 8px; padding: 8px 15px; border: none; background: transparent;
-    }
-    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5);
-    }
+    /* NOWOCZESNA NAWIGACJA (TABS) */
+    [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; }
+    [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0; font-family: 'Oswald', sans-serif !important; font-size: 1rem; border-radius: 8px; padding: 8px 15px; border: none; background: transparent; }
+    [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p { color: white !important; text-shadow: none; }
 
-    /* =========================================================
-       WIELKI PRZYCISK DODAWANIA (Bohater Ekranu)
-       ========================================================= */
+    /* WIELKI PRZYCISK DODAWANIA */
     .stButton>button[kind="primary"] {
         background: linear-gradient(90deg, #c83803 0%, #ff5722 100%); color: white !important; border: none; border-radius: 30px;
         font-family: 'Bebas Neue', cursive; font-size: 2rem !important; letter-spacing: 2px; padding: 15px !important; box-shadow: 0 10px 20px rgba(200, 56, 3, 0.4); width: 100%; transition: transform 0.2s;
     }
     .stButton>button[kind="primary"]:active { transform: scale(0.95); }
-
-    /* Zwykłe przyciski i Formularze */
-    .stButton>button[kind="secondary"] {
-        background-color: #002244; color: white !important; border: 2px solid #ffb612; border-radius: 8px;
-        font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%; font-weight: bold;
-    }
+    .stButton>button[kind="secondary"] { background-color: #002244; color: white !important; border: 2px solid #ffb612; border-radius: 8px; font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%; font-weight: bold; }
     [data-testid="stForm"] { background-color: rgba(255, 255, 255, 0.05); border: 2px solid #c83803; border-radius: 15px; padding: 20px; }
 
-    /* =========================================================
-       KARTY Z WYNIKAMI (SCOREBOARDS)
-       ========================================================= */
-    .hero-card {
-        background-color: #006b3d; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; 
-        box-shadow: 0 8px 15px rgba(0,0,0,0.5); text-align: center; color: white; margin-bottom: 15px;
-    }
-    .hero-card.interstate {
-        background-color: #003882; border: 3px solid #ffffff; border-top: 15px solid #c8102e; 
-        border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 15px;
-    }
+    /* KARTY Z WYNIKAMI (SCOREBOARDS) */
+    .hero-card { background-color: #006b3d; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.5); text-align: center; color: white; margin-bottom: 15px; }
+    .hero-card.interstate { background-color: #003882; border: 3px solid #ffffff; border-top: 15px solid #c8102e; border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 15px; }
     .hero-card.danger { background-color: #c8102e; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; text-align: center; color: white; margin-bottom: 15px; }
-
     .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3rem !important; margin: 0; font-family: 'Bebas Neue', cursive !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; font-family: 'Roboto', sans-serif !important; opacity: 0.9; }
 
-    /* Metryki (Małe kafelki) */
+    /* Metryki */
     [data-testid="stMetric"] { background-color: #111 !important; border: 2px solid #ffb612 !important; border-radius: 10px !important; padding: 15px !important; text-align: center !important; }
     [data-testid="stMetricValue"] div { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; font-size: 2rem !important; }
     [data-testid="stMetricLabel"] p { color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase !important; font-family: 'Roboto', sans-serif !important; font-size: 0.8rem !important; opacity: 1 !important;}
 
-    /* Modale (Wyskakujące okienka) */
+    /* Modale */
     div[role="dialog"] { background-color: #002244 !important; border: 4px solid #c83803; border-radius: 15px; }
     div[role="dialog"] h2 { color: #ffb612 !important; text-align: center; font-family: 'Bebas Neue', cursive !important; }
     div[role="dialog"] p, div[role="dialog"] label { color: white !important; }
@@ -120,6 +82,42 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
+
+# --- SYSTEM LOGOWANIA Z CIASTECZKAMI (COOKIES) ---
+# Inicjalizacja menedżera ciasteczek
+cookie_manager = stx.CookieManager()
+
+def check_password():
+    # Odczytanie ciasteczka logowania (jeśli istnieje)
+    auth_cookie = cookie_manager.get(cookie="midwest_auth")
+    
+    # Zwróć True jeśli ciasteczko mówi "zalogowany" LUB jeśli w tej sesji wpisano już hasło
+    if auth_cookie == "granted" or st.session_state.get("password_correct"):
+        return True
+
+    st.markdown("<h1 style='text-align: center; color: #ffb612;'>🔒 IDENTYFIKACJA</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Wpisz hasło drużyny. Zostaniesz zapamiętany na 30 dni.</p>", unsafe_allow_html=True)
+    
+    with st.form("login_form"):
+        haslo = st.text_input("Hasło:", type="password")
+        if st.form_submit_button("WEJDŹ NA BOISKO (Zaloguj)", use_container_width=True):
+            if haslo == st.secrets.get("app_password", ""):
+                # 1. Zapisz w pamięci krótkiej (dla płynności)
+                st.session_state["password_correct"] = True
+                # 2. Upiecz ciasteczko w przeglądarce (30 dni = 30 * 24h * 60m * 60s)
+                cookie_manager.set("midwest_auth", "granted", max_age=30 * 24 * 60 * 60)
+                st.rerun()
+            else:
+                st.error("❌ Błędne hasło. Sędzia odgwizdał faul.")
+    return False
+
+# Zatrzymuje skrypt w tym miejscu, jeśli nie jesteśmy zalogowani
+if not check_password():
+    st.stop()
+
+# ==============================================================================
+# OD TEGO MIEJSCA KOD URUCHOMI SIĘ TYLKO DLA ZALOGOWANYCH
+# ==============================================================================
 
 # --- BAZA DANYCH ---
 @st.cache_resource
@@ -153,7 +151,6 @@ def save_df(sheet_name, df):
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
     st.toast(f"Zapisano na serwerze w Chicago: {sheet_name}!", icon="☁️")
 
-# Pobieranie na start
 prz_all = load_df("Przychody")
 wyd_all = load_df("Wydatki")
 zob_all = load_df("Zobowiazania")
@@ -191,8 +188,6 @@ def add_operation_modal():
                 st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
-
-# 1. Kontekst Globalny (Miesiąc/Rok) - Teraz wewnątrz głównego granatowego tła
 c_m, c_y = st.columns(2)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
 wybrany_m_nazwa = c_m.selectbox("MIESIĄC ROZLICZENIOWY:", miesiące, index=datetime.now().month - 1)
@@ -201,15 +196,13 @@ wybrany_rok = c_y.selectbox("SEZON:", [2024, 2025, 2026], index=2)
 m_idx = miesiące.index(wybrany_m_nazwa) + 1
 selected_date = date(wybrany_rok, m_idx, 1)
 
-st.write("") # Odstęp
+st.write("") 
 
-# 2. Główny Przycisk Akcji
 if st.button("➕ DODAJ OPERACJĘ", type="primary"):
     add_operation_modal()
 
-st.write("") # Odstęp
+st.write("") 
 
-# 3. Płaska Nawigacja (Zakładki)
 t1, t2, t3, t4 = st.tabs(["🏠 KOKPIT", "📜 HISTORIA", "🏢 STAŁE KOSZTY", "🌽 SEJF (DES MOINES)"])
 
 with t1:
