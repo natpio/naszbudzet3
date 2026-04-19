@@ -6,29 +6,21 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-# Zmieniono initial_sidebar_state na "auto", żeby na komputerze był widoczny, a na telefonie miał przycisk
 st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="auto")
 
-# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + NAPRAWA MENU ---
+# --- STYLIZACJA: CHICAGO/DES MOINES + RWD ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
     /* =========================================================
-       PRZEZROCZYSTY HEADER (Naprawa braku paska bocznego na telefonie)
+       UKRYWANIE ZBĘDNYCH ELEMENTÓW (Bez psujących przycisk menu!)
        ========================================================= */
     #MainMenu {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}  /* Ukrywa 3 kropki po prawej */
-    [data-testid="stHeader"] {background-color: transparent;} /* Pasek jest przezroczysty, ale strzałka menu po lewej zostaje! */
     footer {visibility: hidden;}
-    .stDeployButton {display: none;}
-    
-    .block-container {
-        padding-top: 1rem !important;
-    }
 
     /* =========================================================
-       TŁO GŁÓWNE
+       TŁO GŁÓWNE Z GITHUBA
        ========================================================= */
     .stApp {
         background-image: url('https://raw.githubusercontent.com/natpio/naszbudzet3/refs/heads/main/1776619317829.jpg');
@@ -89,7 +81,7 @@ st.markdown("""
     .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1.2rem; text-transform: uppercase; margin: 0; font-family: 'Roboto', sans-serif !important; }
 
     /* =========================================================
-       NAPRAWA METRYK (Wpływy, Koszty, Odkłożono)
+       METRYKI (Wpływy, Koszty, Odkłożono)
        ========================================================= */
     [data-testid="stMetric"] { 
         background-color: rgba(17, 34, 68, 0.95) !important; border: 3px solid #c83803 !important; 
@@ -106,7 +98,7 @@ st.markdown("""
 
     .ticker-tape { background-color: #111; color: #ffb612; font-family: 'Roboto', monospace; font-weight: bold; padding: 10px; border: 4px solid #333; font-size: 1.2rem; margin-bottom: 30px; text-transform: uppercase; }
 
-    /* --- MOBILE --- */
+    /* --- MOBILE RWD --- */
     @media (max-width: 768px) {
         [data-testid="block-container"] { padding: 15px !important; border-width: 4px !important; margin-top: 0 !important; }
         .hero-card h2, .hero-card.interstate h2 { font-size: 2.2rem !important; }
