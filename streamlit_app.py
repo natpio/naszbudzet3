@@ -6,80 +6,29 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Budżet Domowy", page_icon="💳", layout="wide")
+st.set_page_config(page_title="Nasz Budżet PRO", page_icon="🏦", layout="wide")
 
-# --- NOWOCZESNY DESIGN (APLIKACJA WEBOWA) ---
+# --- STYLIZACJA UI ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
     
-    .stApp { 
-        background-color: #f4f7f6;
-        font-family: 'Inter', sans-serif;
-    }
-    
-    /* Główne nagłówki */
-    h1, h2, h3 { color: #111827; font-weight: 800; letter-spacing: -0.5px; }
-    
-    /* Karty metryk (Statystyki) */
     div[data-testid="metric-container"] {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        padding: 24px;
-        border-radius: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        background: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 16px;
     }
-    
-    /* Wartości w kartach */
-    [data-testid="stMetricValue"] { 
-        font-size: 2rem; 
-        font-weight: 800;
-        color: #111827;
-    }
-    
-    /* Przyciski Akcji */
-    .stButton>button { 
-        background-color: #0f172a;
-        color: #ffffff; 
-        border: none;
-        border-radius: 10px; 
-        font-weight: 600; 
-        padding: 0.5rem 1rem;
-        transition: all 0.2s;
-    }
-    .stButton>button:hover {
-        background-color: #334155;
-        transform: translateY(-1px);
-    }
-    
-    /* Karta Dziennego Limitu */
     .hero-card {
-        background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-        color: white; 
-        padding: 30px; 
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(37, 99, 235, 0.2);
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        color: white; padding: 32px; border-radius: 24px; text-align: center;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     }
-    .hero-card h2 { color: white; font-size: 3.5rem; margin-top: 5px; margin-bottom: 5px;}
-    .hero-card p { font-size: 1.1rem; opacity: 0.9; margin: 0; }
+    .hero-card h2 { color: #f8fafc !important; font-size: 3.5rem !important; margin: 10px 0; }
     
-    /* Zakładki (Tabs) */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: transparent;
-        border-radius: 4px 4px 0px 0px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        font-weight: 600;
-    }
+    .stButton>button { border-radius: 12px; font-weight: 600; transition: all 0.2s; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- POŁĄCZENIE Z GOOGLE SHEETS ---
+# --- POŁĄCZENIE ---
 @st.cache_resource
 def init_connection():
     try:
@@ -102,228 +51,170 @@ def init_connection():
 
 sh = init_connection()
 
-# --- FUNKCJE BAZY DANYCH ---
+# --- FUNKCJE BAZY ---
 def load_df(sheet_name):
     try:
         data = sh.worksheet(sheet_name).get_all_records()
         df = pd.DataFrame(data)
-        if not df.empty:
-            if 'Data' in df.columns: df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
-            if 'Data końca' in df.columns: df['Data końca'] = pd.to_datetime(df['Data końca'], errors='coerce')
+        # Upewniamy się, że Data to zawsze poprawny format czasu, aby uniknąć błędów
+        if not df.empty and 'Data' in df.columns:
+            df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
         return df
-    except: return pd.DataFrame()
+    except: 
+        return pd.DataFrame()
 
 def save_df(sheet_name, df):
-    try:
-        sheet = sh.worksheet(sheet_name)
-        sheet.clear()
-        df_to_save = df.copy()
-        for col in df_to_save.select_dtypes(include=['datetime64']).columns:
-            df_to_save[col] = df_to_save[col].dt.strftime('%Y-%m-%d')
-        sheet.update([df_to_save.columns.values.tolist()] + df_to_save.fillna("").values.tolist())
-        st.toast(f"✅ Zapisano: {sheet_name}")
-    except Exception as e: st.error(f"Błąd zapisu: {e}")
+    sheet = sh.worksheet(sheet_name)
+    sheet.clear()
+    df_save = df.copy()
+    if 'Data' in df_save.columns:
+        df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
+    st.toast(f"✅ Zaktualizowano: {sheet_name}")
 
-# --- AUTOMATYZACJA ---
-def run_monthly_billing(month_date):
-    wyd = load_df("Wydatki")
-    if wyd.empty or 'Data' not in wyd.columns: return
-    m_str = month_date.strftime("%Y-%m")
-    
-    already_billed = wyd[(wyd['Data'].dt.strftime("%Y-%m") == m_str) & (wyd['Nazwa'].astype(str).str.contains("🔄"))]
-    if already_billed.empty:
-        aktywne = wyd[
-            ((wyd['Typ'].astype(str).str.contains("Stały")) | (wyd['Kategoria'] == "Subskrypcje")) &
-            (wyd['Data'] < month_date) &
-            ((wyd['Data końca'].isna()) | (wyd['Data końca'] >= month_date)) &
-            (~wyd['Nazwa'].astype(str).str.contains("🔄"))
-        ].copy()
-        
-        if not aktywne.empty:
-            if st.sidebar.button(f"⚡ Pobierz stałe koszty ({m_str})", use_container_width=True):
-                for _, r in aktywne.iterrows():
-                    sh.worksheet("Wydatki").append_row([
-                        month_date.strftime("%Y-%m-01"), f"🔄 {r['Nazwa']}", r['Kategoria'], r['Typ'], r['Kwota'],
-                        r['Data końca'].strftime('%Y-%m-%d') if pd.notna(r['Data końca']) else ""
-                    ])
-                st.rerun()
-
-# --- SIDEBAR (SELEKTOR MIESIĄCA) ---
-st.sidebar.markdown("### 📅 Okres rozliczeniowy")
+# --- NAWIGACJA BOCZNA ---
+st.sidebar.title("🏦 Menu Główne")
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
-lata = list(range(2024, 2030))
+wybrany_m = st.sidebar.selectbox("Miesiąc", miesiące, index=datetime.now().month - 1)
+wybrany_rok = st.sidebar.selectbox("Rok", [2024, 2025, 2026], index=2)
 
-dzis = date.today()
-c1, c2 = st.sidebar.columns(2)
-wybrany_m_nazwa = c1.selectbox("Miesiąc", miesiące, index=dzis.month - 1)
-wybrany_rok = c2.selectbox("Rok", lata, index=lata.index(dzis.year))
-
-# Tworzenie obiektu daty na 1. dzień wybranego miesiąca
-m_idx = miesiące.index(wybrany_m_nazwa) + 1
+m_idx = miesiące.index(wybrany_m) + 1
 selected_date = date(wybrany_rok, m_idx, 1)
 
-run_monthly_billing(selected_date)
 st.sidebar.markdown("---")
-menu = st.sidebar.radio("Nawigacja:", ["🏠 Kokpit", "📥 Przychody", "💸 Wydatki", "🐷 Oszczędności", "📅 Raty"])
-
-def filter_month(df):
-    if df.empty or 'Data' not in df.columns: return df
-    return df[df['Data'].dt.strftime("%Y-%m") == selected_date.strftime("%Y-%m")]
+menu = st.sidebar.radio("Nawigacja", ["🏠 Kokpit", "🛒 Wydatki Codzienne", "🗓️ Stałe Zobowiązania", "📥 Przychody", "🐷 Oszczędności"])
 
 # --- WIDOKI ---
 if menu == "🏠 Kokpit":
-    st.markdown(f"<h1>Podsumowanie: {wybrany_m_nazwa} {wybrany_rok}</h1>", unsafe_allow_html=True)
+    st.title(f"Analiza: {wybrany_m} {wybrany_rok}")
     
-    prz_m = filter_month(load_df("Przychody"))
-    wyd_m = filter_month(load_df("Wydatki"))
-    osz_m = filter_month(load_df("Oszczednosci"))
-    raty = load_df("Raty")
+    prz = load_df("Przychody")
+    wyd_c = load_df("Wydatki") # Tylko wydatki codzienne
+    zob = load_df("Zobowiazania") # Subskrypcje, Raty, Stałe opłaty
+    osz = load_df("Oszczednosci")
     
-    # Matma
-    s_wplywy = prz_m['Kwota'].sum() if not prz_m.empty else 0
-    s_wydatki = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
-    s_raty = pd.to_numeric(raty['Kwota raty'], errors='coerce').sum() if not raty.empty else 0
-    w_osz = osz_m[osz_m['Typ'] == 'Wpłata']['Kwota'].sum() if not osz_m.empty and 'Typ' in osz_m.columns else 0
+    # Filtracja danych dla wybranego miesiąca (bezpieczna za pomocą tekstowego strftime)
+    m_str = selected_date.strftime("%Y-%m")
+    prz_m = prz[prz['Data'].dt.strftime("%Y-%m") == m_str] if not prz.empty else pd.DataFrame()
+    wyd_m = wyd_c[wyd_c['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_c.empty else pd.DataFrame()
+    osz_m = osz[osz['Data'].dt.strftime("%Y-%m") == m_str] if not osz.empty else pd.DataFrame()
     
-    # Wolne środki 
-    wolne = s_wplywy - s_wydatki - s_raty - w_osz
+    # Podsumowanie liczbowe
+    s_prz = prz_m['Kwota'].sum() if not prz_m.empty else 0
+    s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
+    s_zobowiazania = zob['Kwota'].sum() if not zob.empty else 0
+    w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if not osz_m.empty and 'Akcja' in osz_m.columns else 0
     
-    # Zamknięcie miesiąca (jeśli zostały wolne środki)
-    ostatni_dzien_m = calendar.monthrange(wybrany_rok, m_idx)[1]
-    if wolne > 0:
-        st.info(f"💡 Zostało Wam jeszcze {wolne:,.2f} zł w tym miesiącu.")
-        if st.button("🔒 Zamknij ten miesiąc (Przelej nadwyżkę na Oszczędności)"):
-            data_zamkniecia = f"{wybrany_rok}-{m_idx:02d}-{ostatni_dzien_m}"
-            sh.worksheet("Oszczednosci").append_row([data_zamkniecia, f"Nadwyżka z {wybrany_m_nazwa} {wybrany_rok}", wolne, "Wpłata"])
-            st.success("Miesiąc zamknięty! Środki zabezpieczone.")
-            st.rerun()
-
-    # Dniówka
+    # Kasa na życie (Wpływy z danego miesiąca MINUS wszystkie obciążenia i wpłaty na oszczędności)
+    wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
+    
+    # Dniówka (Licznik przetrwania)
+    ostatni_dzien = calendar.monthrange(wybrany_rok, m_idx)[1]
+    dzis = date.today()
     if dzis.month == m_idx and dzis.year == wybrany_rok:
-        pozostalo_dni = ostatni_dzien_m - dzis.day + 1
+        pozostalo_dni = ostatni_dzien - dzis.day + 1
     elif selected_date < dzis:
-        pozostalo_dni = 0 # Miesiąc minął
+        pozostalo_dni = 0 # Ten miesiąc już minął
     else:
-        pozostalo_dni = ostatni_dzien_m
-
+        pozostalo_dni = ostatni_dzien
+        
     dniowka = wolne / pozostalo_dni if pozostalo_dni > 0 and wolne > 0 else 0
 
-    st.write("") # Odstęp
-    c_hero1, c_hero2 = st.columns(2)
-    with c_hero1:
-        st.markdown(f"""
-            <div class='hero-card'>
-                <p>Wolne środki (Na koncie)</p>
-                <h2>{wolne:,.2f} zł</h2>
-            </div>
-        """, unsafe_allow_html=True)
-    with c_hero2:
-        if pozostalo_dni > 0:
-            st.markdown(f"""
-                <div class='hero-card' style='background: linear-gradient(135deg, #10b981 0%, #059669 100%);'>
-                    <p>Budżet dzienny (zostało {pozostalo_dni} dni)</p>
-                    <h2>{dniowka:,.2f} zł</h2>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-                <div class='hero-card' style='background: linear-gradient(135deg, #64748b 0%, #475569 100%);'>
-                    <p>Miesiąc zakończony</p>
-                    <h2>-</h2>
-                </div>
-            """, unsafe_allow_html=True)
+    c_h1, c_h2 = st.columns(2)
+    with c_h1:
+        st.markdown(f"<div class='hero-card'><p>Zostało na życie w tym miesiącu</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
+    with c_h2:
+        bg_color = "linear-gradient(135deg, #059669 0%, #10b981 100%)" if pozostalo_dni > 0 else "linear-gradient(135deg, #64748b 0%, #475569 100%)"
+        st.markdown(f"<div class='hero-card' style='background:{bg_color}'><p>Budżet dzienny (przez {pozostalo_dni} dni)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
 
-    st.write("### Szczegóły rozliczenia")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Wpływy", f"{s_wplywy:,.2f} zł")
-    c2.metric("Wydatki i Raty", f"{(s_wydatki + s_raty):,.2f} zł")
-    c3.metric("Odkłożono", f"{w_osz:,.2f} zł")
+    st.write("---")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Wpływy", f"{s_prz:,.2f} zł")
+    col2.metric("Stałe opłaty", f"{s_zobowiazania:,.2f} zł")
+    col3.metric("Dzisiejsze zakupy", f"{s_codzienne:,.2f} zł")
+    col4.metric("Odkłożono", f"{w_osz:,.2f} zł")
+
+elif menu == "🛒 Wydatki Codzienne":
+    st.title("🛒 Wydatki Codzienne")
+    st.info("Nie musisz wybierać daty! Kliknij 'Zapisz', a aplikacja sama doda dzisiejszą datę i dokładną godzinę zakupu.")
+    
+    with st.form("quick_add", clear_on_submit=True):
+        c1, c2, c3 = st.columns([2,1,1])
+        nazwa = c1.text_input("Co zostało kupione?")
+        kwota = c2.number_input("Kwota", min_value=0.0, step=5.0)
+        kat = c3.selectbox("Kategoria", ["Jedzenie", "Dom", "Transport", "Zdrowie", "Rozrywka", "Inne"])
+        if st.form_submit_button("⚡ ZAPISZ ZAKUP"):
+            if kwota > 0 and nazwa:
+                teraz = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                sh.worksheet("Wydatki").append_row([teraz, nazwa, kat, kwota])
+                st.success("Zapisano zakup!")
+                st.rerun()
+
+    df_w = load_df("Wydatki")
+    if not df_w.empty:
+        st.write("### Ostatnie paragony (Edycja)")
+        ed_w = st.data_editor(df_w.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
+        if st.button("💾 Zapisz poprawki w historii"): 
+            save_df("Wydatki", ed_w)
+
+elif menu == "🗓️ Stałe Zobowiązania":
+    st.title("🗓️ Stałe Zobowiązania")
+    st.markdown("Tutaj zarządzacie opłatami, które nie zmieniają się z dnia na dzień. Aplikacja co miesiąc odliczy je z automatu z Waszego budżetu.")
+    
+    t1, t2 = st.tabs(["📋 Lista opłat", "➕ Dodaj Nowe Zobowiązanie"])
+    
+    with t2:
+        with st.form("add_zob", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            n = c1.text_input("Nazwa (np. Netflix, Czynsz, Rata za auto)")
+            k = c2.number_input("Kwota miesięczna", min_value=0.0)
+            typ = st.selectbox("Typ", ["Subskrypcja", "Koszt Stały", "Rata Kredytu"])
+            if st.form_submit_button("Dodaj do planu"):
+                if n and k > 0:
+                    sh.worksheet("Zobowiazania").append_row([n, typ, k])
+                    st.rerun()
+                
+    with t1:
+        df_z = load_df("Zobowiazania")
+        if not df_z.empty:
+            ed_z = st.data_editor(df_z, hide_index=True, num_rows="dynamic", use_container_width=True)
+            if st.button("💾 Zaktualizuj bazę stałych opłat"): 
+                save_df("Zobowiazania", ed_z)
 
 elif menu == "📥 Przychody":
-    st.markdown("<h1>Rejestr Przychodów</h1>", unsafe_allow_html=True)
-    
-    t1, t2 = st.tabs(["📋 Baza danych", "➕ Dodaj nowy wpływ"])
-    
-    with t2:
-        with st.form("f_prz", clear_on_submit=True):
-            st.write("Zarejestruj nowy przychód")
-            c1, c2 = st.columns(2)
-            zrodlo = c1.text_input("Źródło (np. Wypłata, Sprzedaż)")
-            forma = c2.selectbox("Gdzie?", ["Konto", "Gotówka"])
-            kwota = st.number_input("Kwota (zł)", min_value=0.0, step=100.0)
-            if st.form_submit_button("Zapisz wpływ"):
-                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d"), zrodlo, forma, kwota])
-                st.rerun()
-                
-    with t1:
-        df_p = load_df("Przychody")
-        if not df_p.empty:
-            ed_p = st.data_editor(df_p, hide_index=True, use_container_width=True, 
-                                  column_config={"Kwota": st.column_config.NumberColumn(format="%.2f zł")})
-            if st.button("💾 Nadpisz zmiany"): save_df("Przychody", ed_p)
-
-elif menu == "💸 Wydatki":
-    st.markdown("<h1>Koszty i Wydatki</h1>", unsafe_allow_html=True)
-    
-    t1, t2 = st.tabs(["📋 Lista wydatków", "🛒 Dodaj wydatek"])
-    
-    with t2:
-        with st.form("f_wyd", clear_on_submit=True):
-            n = st.text_input("Nazwa (np. Zakupy Biedronka, Czynsz)")
-            c1, c2 = st.columns(2)
-            k = c1.number_input("Kwota (zł)", min_value=0.0)
-            typ = c2.selectbox("Rodzaj", ["Zmienny (jednorazowy)", "Stały (rachunki)", "Subskrypcje"])
-            kat = st.selectbox("Kategoria", ["Dom i Rachunki", "Jedzenie", "Transport", "Dzieci", "Rozrywka", "Inne"])
-            dk = st.date_input("Koniec subskrypcji/umowy (opcjonalne)", value=None)
-            if st.form_submit_button("Dodaj"):
-                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d"), n, kat, typ, k, dk.strftime("%Y-%m-%d") if dk else ""])
+    st.title("📥 Rejestr Przychodów")
+    with st.form("add_prz", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        zrodlo = c1.text_input("Źródło (np. Pensja, Sprzedaż)")
+        kwota = c2.number_input("Kwota", min_value=0.0)
+        forma = st.selectbox("Forma", ["Konto", "Gotówka"])
+        if st.form_submit_button("Zapisz wpływ"):
+            if zrodlo and kwota > 0:
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), zrodlo, forma, kwota])
                 st.rerun()
 
-    with t1:
-        df_w = load_df("Wydatki")
-        if not df_w.empty:
-            ed_w = st.data_editor(df_w, hide_index=True, use_container_width=True,
-                                  column_config={"Kwota": st.column_config.NumberColumn(format="%.2f zł")})
-            if st.button("💾 Nadpisz zmiany"): save_df("Wydatki", ed_w)
+    df_p = load_df("Przychody")
+    if not df_p.empty:
+        st.write("### Baza wpływów")
+        ed_p = st.data_editor(df_p.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
+        if st.button("💾 Nadpisz wpływy"): 
+            save_df("Przychody", ed_p)
 
 elif menu == "🐷 Oszczędności":
-    st.markdown("<h1>Fundusze Celowe</h1>", unsafe_allow_html=True)
-    
-    osz_all = load_df("Oszczednosci")
-    if not osz_all.empty and 'Typ' in osz_all.columns:
-        tot = osz_all[osz_all['Typ']=='Wpłata']['Kwota'].sum() - osz_all[osz_all['Typ']=='Wypłata']['Kwota'].sum()
-    else: tot = 0
-    
-    st.info(f"💰 Całkowity stan oszczędności (z wszystkich miesięcy): **{tot:,.2f} zł**")
-    
-    t1, t2 = st.tabs(["📋 Rejestr operacji", "⚙️ Wpłać / Wypłać"])
-    
-    with t2:
-        with st.form("f_osz", clear_on_submit=True):
-            cel = st.text_input("Cel (np. Wakacje, Awaria, Poduszka)")
-            c1, c2 = st.columns(2)
-            akcja = c1.selectbox("Akcja", ["Wpłata", "Wypłata"])
-            kw = c2.number_input("Kwota (zł)", min_value=0.0)
-            if st.form_submit_button("Potwierdź operację"):
-                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d"), cel, kw, akcja])
+    st.title("🐷 Oszczędności")
+    with st.form("add_osz", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        cel = c1.text_input("Cel (np. Wakacje)")
+        kwota = c2.number_input("Kwota", min_value=0.0)
+        akcja = c3.selectbox("Rodzaj operacji", ["Wpłata", "Wypłata"])
+        if st.form_submit_button("Zapisz operację"):
+            if cel and kwota > 0:
+                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cel, kwota, akcja])
                 st.rerun()
-                
-    with t1:
-        if not osz_all.empty:
-            ed_o = st.data_editor(osz_all, hide_index=True, use_container_width=True,
-                                  column_config={"Kwota": st.column_config.NumberColumn(format="%.2f zł")})
-            if st.button("💾 Nadpisz zmiany"): save_df("Oszczednosci", ed_o)
 
-elif menu == "📅 Raty":
-    st.markdown("<h1>Raty i Kredyty</h1>", unsafe_allow_html=True)
-    st.write("Ta sekcja ignoruje filtr miesiąca – pokazuje Wasze stałe obciążenia w ujęciu ogólnym.")
-    
-    df_r = load_df("Raty")
-    if df_r.empty:
-        df_r = pd.DataFrame(columns=["Nazwa banku/kredytu", "Dzień płatności", "Kwota raty", "Pozostało do spłaty", "Data końcowa"])
-    
-    ed_r = st.data_editor(df_r, hide_index=True, num_rows="dynamic", use_container_width=True,
-                          column_config={"Kwota raty": st.column_config.NumberColumn(format="%.2f zł"), 
-                                         "Pozostało do spłaty": st.column_config.NumberColumn(format="%.2f zł")})
-    if st.button("💾 Zaktualizuj harmonogram"):
-        save_df("Raty", ed_r)
+    df_o = load_df("Oszczednosci")
+    if not df_o.empty:
+        st.write("### Historia Oszczędności")
+        ed_o = st.data_editor(df_o.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
+        if st.button("💾 Zapisz zmiany w skarbonce"): 
+            save_df("Oszczednosci", ed_o)
