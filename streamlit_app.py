@@ -4,14 +4,15 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="Budżet Domowy PRO", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Rodzinny Budżet PRO", page_icon="🏦", layout="wide")
 
-# --- STYLIZACJA PRO ---
+# --- STYLIZACJA ---
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
-    h1, h2 { color: #2c3e50; font-family: 'Helvetica Neue', sans-serif; }
-    .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 5px solid #3498db; }
+    .stApp { background-color: #f0f2f6; }
+    [data-testid="stMetricValue"] { font-size: 1.8rem; color: #1e3a8a; }
+    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .css-1kyx001 { background-color: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -20,7 +21,6 @@ st.markdown("""
 def init_connection():
     creds = st.secrets["connections"]["gsheets"]
     key = creds["private_key"].replace("\\n", "\n").strip()
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     credentials = Credentials.from_service_account_info(
         {
             "client_email": creds["client_email"],
@@ -28,100 +28,107 @@ def init_connection():
             "token_uri": creds["token_uri"],
             "project_id": creds.get("project_id", "budzet"),
         },
-        scopes=scopes
+        scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     )
-    gc = gspread.authorize(credentials)
-    return gc.open_by_url(creds["spreadsheet"])
+    return gspread.authorize(credentials).open_by_url(creds["spreadsheet"])
 
 sh = init_connection()
 
-def load_data(sheet_name):
-    if sh:
-        data = sh.worksheet(sheet_name).get_all_records()
-        return pd.DataFrame(data) if data else pd.DataFrame()
-    return pd.DataFrame()
+def load_df(sheet_name):
+    data = sh.worksheet(sheet_name).get_all_records()
+    return pd.DataFrame(data) if data else pd.DataFrame()
 
-# Funkcja do nadpisywania całego arkusza (dzięki temu działa edycja i usuwanie)
-def save_data(sheet_name, df):
-    if sh:
-        sheet = sh.worksheet(sheet_name)
-        sheet.clear()
-        # Zapisujemy nagłówki + dane
-        sheet.update([df.columns.values.tolist()] + df.values.tolist())
-        st.toast(f"✅ Zapisano zmiany w: {sheet_name}")
+def save_df(sheet_name, df):
+    sheet = sh.worksheet(sheet_name)
+    sheet.clear()
+    sheet.update([df.columns.values.tolist()] + df.fillna("").values.tolist())
+    st.success(f"Zaktualizowano: {sheet_name}!")
 
-# --- MENU BOCZNE ---
-with st.sidebar:
-    st.markdown("## 📊 Panel Sterowania")
-    view = st.radio("Wybierz moduł:", ["Dashboard", "Przychody", "Wydatki i Koszty Stałe", "Kredyty i Raty"])
-
-# --- WIDOKI ---
-if view == "Dashboard":
-    st.title("📈 Podsumowanie Finansów")
-    df_prz = load_data("Przychody")
-    df_wyd = load_data("Wydatki")
+# --- AUTOMATYZACJA 800+ ---
+def sync_recurring_benefits():
+    df = load_df("Przychody")
+    current_month = datetime.now().strftime("%Y-%m")
+    mask = (df['Źródło'] == "800+") & (df['Data'].str.startswith(current_month))
     
-    in_sum = pd.to_numeric(df_prz["Kwota"], errors='coerce').sum() if not df_prz.empty else 0
-    out_sum = pd.to_numeric(df_wyd["Kwota"], errors='coerce').sum() if not df_wyd.empty else 0
-    bilans = in_sum - out_sum
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Łączne Przychody", f"{in_sum:,.2f} zł")
-    col2.metric("Łączne Wydatki", f"{out_sum:,.2f} zł")
-    col3.metric("Bilans", f"{bilans:,.2f} zł", delta=f"{bilans:,.2f} zł")
-
-elif view == "Przychody":
-    st.title("💵 Zarządzanie Przychodami")
-    
-    # Szybkie dodawanie
-    st.subheader("⚡ Szybkie akcje")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("➕ Dodaj 800+ (Dzieci)"):
-            sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d"), "Rodzina", "800+", "Konto", 1600.0])
-            st.success("Dodano 1600 zł z 800+!")
+    if df.empty or not mask.any():
+        if st.sidebar.button("🚨 Dodaj 800+ za ten miesiąc"):
+            sh.worksheet("Przychody").append_row([
+                datetime.now().strftime("%Y-%m-%d"), "Rodzina", "800+", "Konto", 1600.0
+            ])
             st.rerun()
-            
-    # Edytor danych w czasie rzeczywistym
-    st.subheader("Edytuj / Usuń Przychody")
-    df_prz = load_data("Przychody")
-    if not df_prz.empty:
-        # data_editor pozwala na edycję w komórkach i usuwanie wierszy
-        edited_df = st.data_editor(df_prz, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Zapisz zmiany w Przychodach"):
-            save_data("Przychody", edited_df)
 
-elif view == "Wydatki i Koszty Stałe":
-    st.title("💳 Koszty i Wydatki")
+# --- INTERFEJS ---
+sync_recurring_benefits()
+
+menu = st.sidebar.selectbox("Menu", ["🏠 Dashboard", "💰 Przychody", "💸 Wydatki & Koszty", "📅 Raty & Kredyty"])
+
+if menu == "🏠 Dashboard":
+    st.title("📊 Przegląd Miesięczny")
     
-    # Formularz szybkiego dodawania kosztów stałych/zmiennych
-    with st.expander("➕ Dodaj nowy wydatek", expanded=False):
-        with st.form("form_wyd"):
-            nazwa = st.text_input("Nazwa (np. Czynsz, Biedronka)")
-            kwota = st.number_input("Kwota", min_value=0.0)
-            typ = st.selectbox("Typ", ["Stały", "Zmienny"])
-            kat = st.selectbox("Kategoria", ["Dom", "Jedzenie", "Transport", "Dzieci", "Rozrywka", "Inne"])
-            if st.form_submit_button("Dodaj Wydatek"):
-                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d"), nazwa, kat, typ, kwota])
-                st.success("Dodano wydatek!")
+    prz = load_df("Przychody")
+    wyd = load_df("Wydatki")
+    raty = load_df("Raty")
+    
+    total_in = pd.to_numeric(prz["Kwota"], errors='coerce').sum()
+    total_out = pd.to_numeric(wyd["Kwota"], errors='coerce').sum()
+    total_raty = pd.to_numeric(raty["Kwota raty"], errors='coerce').sum()
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Przychody", f"{total_in:,.2f} zł")
+    c2.metric("Wydatki", f"{total_out:,.2f} zł")
+    c3.metric("Suma Rat", f"{total_raty:,.2f} zł")
+    c4.metric("Zostaje", f"{(total_in - total_out - total_raty):,.2f} zł")
+
+    st.subheader("Struktura Przychodu")
+    st.bar_chart(prz.groupby("Osoba")["Kwota"].sum())
+
+elif menu == "💰 Przychody":
+    st.title("💰 Zarobki Natalii i Piotrka")
+    
+    with st.expander("➕ Szybkie dodawanie"):
+        with st.form("add_prz"):
+            col1, col2 = st.columns(2)
+            osoba = col1.selectbox("Kto?", ["Natalia", "Piotrek", "Rodzina"])
+            zrodlo = col2.text_input("Źródło (np. Pensja, Premia)")
+            typ = col1.selectbox("Gdzie?", ["Konto", "Gotówka"])
+            kwota = col2.number_input("Kwota", min_value=0.0)
+            if st.form_submit_button("Dodaj"):
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d"), osoba, zrodlo, typ, kwota])
                 st.rerun()
 
-    st.subheader("Baza Wydatków (Edycja i Usuwanie)")
-    df_wyd = load_data("Wydatki")
-    if not df_wyd.empty:
-        edited_wyd = st.data_editor(df_wyd, num_rows="dynamic", use_container_width=True)
-        if st.button("💾 Zapisz zmiany w Wydatkach"):
-            save_data("Wydatki", edited_wyd)
+    df_p = load_df("Przychody")
+    if not df_p.empty:
+        st.info("💡 Możesz edytować komórki bezpośrednio w tabeli. Kliknij przycisk na dole, by zapisać.")
+        ed_df = st.data_editor(df_p, num_rows="dynamic", use_container_width=True)
+        if st.button("Zapisz zmiany w przychodach"):
+            save_df("Przychody", ed_df)
 
-elif view == "Kredyty i Raty":
-    st.title("📅 Harmonogram Rat")
-    st.info("Tutaj wpiszcie swoje stałe obciążenia ratalne. Możesz bezpośrednio w tabeli dodawać nowe wiersze.")
+elif menu == "💸 Wydatki & Koszty":
+    st.title("💸 Koszty Stałe i Zmienne")
+    df_w = load_df("Wydatki")
     
-    df_raty = load_data("Raty")
-    # Jeśli arkusz jest pusty, tworzymy pusty schemat, żeby data_editor zadziałał
-    if df_raty.empty:
-        df_raty = pd.DataFrame(columns=["Nazwa banku/kredytu", "Dzień płatności", "Kwota raty", "Pozostało do spłaty", "Data końcowa"])
-        
-    edited_raty = st.data_editor(df_raty, num_rows="dynamic", use_container_width=True)
-    if st.button("💾 Zapisz stan rat"):
-        save_data("Raty", edited_raty)
+    tab1, tab2 = st.tabs(["Dodaj Nowy", "Lista i Edycja"])
+    
+    with tab1:
+        with st.form("add_wyd"):
+            n = st.text_input("Nazwa (Czynsz, Prąd, Biedronka...)")
+            k = st.number_input("Kwota", min_value=0.0)
+            t = st.selectbox("Rodzaj", ["Stały", "Zmienny"])
+            kat = st.selectbox("Kategoria", ["Dom", "Jedzenie", "Transport", "Dzieci", "Przyjemności"])
+            if st.form_submit_button("Zapisz wydatek"):
+                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d"), n, kat, t, k])
+                st.rerun()
+                
+    with tab2:
+        ed_w = st.data_editor(df_w, num_rows="dynamic", use_container_width=True)
+        if st.button("Zapisz zmiany w wydatkach"):
+            save_df("Wydatki", ed_w)
+
+elif menu == "📅 Raty & Kredyty":
+    st.title("📅 Harmonogram Spłat")
+    df_r = load_df("Raty")
+    
+    st.warning("Pamiętaj o wpisywaniu daty spłaty, aby system mógł Ci o niej przypominać!")
+    ed_r = st.data_editor(df_r, num_rows="dynamic", use_container_width=True)
+    if st.button("Zaktualizuj bazę rat"):
+        save_df("Raty", ed_r)
