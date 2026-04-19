@@ -8,16 +8,32 @@ import calendar
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="auto")
 
-# --- STYLIZACJA: CHICAGO/DES MOINES + RWD ---
+# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + ZABÓJCA BIAŁEGO PASKA ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
     /* =========================================================
-       UKRYWANIE ZBĘDNYCH ELEMENTÓW (Bez psujących przycisk menu!)
+       ZABÓJCA BIAŁEGO PASKA (100% Przezroczystości Headera)
        ========================================================= */
+    [data-testid="stHeader"], header, .stAppHeader {
+        background-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    
+    /* Ukrycie prawego menu (Deploy, 3 kropki), zostaje tylko Hamburger Menu po lewej */
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    
+    .block-container {
+        padding-top: 2rem !important; /* Mniejsze światło na górze */
+    }
 
     /* =========================================================
        TŁO GŁÓWNE Z GITHUBA
