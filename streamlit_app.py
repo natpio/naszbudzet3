@@ -133,7 +133,12 @@ sh = init_connection()
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
-        if not df.empty and 'Data' in df.columns: df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+        # Bezpieczne konwertowanie dat na typ datetime, omijając puste stringi
+        if not df.empty:
+            for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
+                if col in df.columns:
+                    # Zamienia wszystko co puste/błędne na NaT (Not a Time)
+                    df[col] = pd.to_datetime(df[col], errors='coerce') 
         return df
     except: return pd.DataFrame()
 
@@ -141,7 +146,13 @@ def save_df(sheet_name, df):
     sheet = sh.worksheet(sheet_name)
     sheet.clear()
     df_save = df.copy()
-    if 'Data' in df_save.columns: df_save['Data'] = df_save['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Zamiana obiektów Datetime z powrotem na ładne stringi przed zapisem do Sheets
+    for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
+        if col in df_save.columns:
+            # Jeśli NaT (puste) - wpisz pusty string "", inaczej wstaw datę
+            df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+            
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
     st.toast(f"Zapisano na serwerze w Chicago: {sheet_name}!", icon="☁️")
 
@@ -185,10 +196,11 @@ def add_operation_modal():
 c_m, c_y = st.columns(2)
 miesiące = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"]
 wybrany_m_nazwa = c_m.selectbox("MIESIĄC ROZLICZENIOWY:", miesiące, index=datetime.now().month - 1)
-wybrany_rok = c_y.selectbox("SEZON:", [2024, 2025, 2026], index=2)
+wybrany_rok = c_y.selectbox("SEZON:", [2024, 2025, 2026, 2027], index=2)
 
 m_idx = miesiące.index(wybrany_m_nazwa) + 1
-selected_date = date(wybrany_rok, m_idx, 1)
+# Kontekst czasowy dla aplikacji (np. 1 Kwiecień 2026)
+selected_date = pd.to_datetime(f"{wybrany_rok}-{m_idx:02d}-01")
 
 st.write("") 
 
@@ -206,9 +218,25 @@ with t1:
     wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
     osz_m = osz_all[osz_all['Data'].dt.strftime("%Y-%m") == m_str] if not osz_all.empty else pd.DataFrame()
     
+    # INTELIGENTNE ODLICZANIE STAŁYCH KOSZTÓW
+    # Bierzemy pod uwagę daty rozpoczęcia i zakończenia kontraktów!
+    if not zob_all.empty:
+        # Zabezpieczenie przed brakiem kolumn w starym arkuszu
+        if 'Data rozpoczęcia' not in zob_all.columns: zob_all['Data rozpoczęcia'] = pd.NaT
+        if 'Data zakończenia' not in zob_all.columns: zob_all['Data zakończenia'] = pd.NaT
+            
+        zob_aktywne = zob_all[
+            # Kontrakt zaczął się w tym miesiącu ALBO wcześniej (lub data startu nie jest podana)
+            ((zob_all['Data rozpoczęcia'] <= selected_date) | (zob_all['Data rozpoczęcia'].isnull())) &
+            # Kontrakt kończy się w tym miesiącu ALBO później (lub trwa w nieskończoność)
+            ((zob_all['Data zakończenia'] >= selected_date) | (zob_all['Data zakończenia'].isnull()))
+        ]
+        s_zobowiazania = zob_aktywne['Kwota'].sum()
+    else:
+        s_zobowiazania = 0
+
     s_prz = prz_m['Kwota'].sum() if not prz_m.empty else 0
     s_codzienne = wyd_m['Kwota'].sum() if not wyd_m.empty else 0
-    s_zobowiazania = zob_all['Kwota'].sum() if not zob_all.empty else 0
     w_osz = osz_m[osz_m['Akcja'] == 'Wpłata']['Kwota'].sum() if (not osz_m.empty and 'Akcja' in osz_m.columns) else 0
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
@@ -216,7 +244,7 @@ with t1:
     ostatni_dzien = calendar.monthrange(wybrany_rok, m_idx)[1]
     dzis = date.today()
     if dzis.month == m_idx and dzis.year == wybrany_rok: pozostalo_dni = ostatni_dzien - dzis.day + 1
-    elif selected_date < dzis: pozostalo_dni = 0
+    elif selected_date.date() < dzis: pozostalo_dni = 0
     else: pozostalo_dni = ostatni_dzien
         
     dniowka = wolne / pozostalo_dni if pozostalo_dni > 0 and wolne > 0 else 0
@@ -233,7 +261,7 @@ with t1:
 
 with t2:
     st.markdown("<h3>📜 Ostatnie Akcje na Koncie</h3>", unsafe_allow_html=True)
-    st.write("Twoje codzienne wydatki na mieście.")
+    st.write("Twoje codzienne wydatki na mieście (z wybranego u góry miesiąca).")
     
     m_str = selected_date.strftime("%Y-%m")
     wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
@@ -246,21 +274,43 @@ with t2:
 
 with t3:
     st.markdown("<h3>🏢 Kontrakty i Rachunki</h3>", unsafe_allow_html=True)
-    st.write("Wprowadzasz to tylko raz, system z automatu odliczy to co miesiąc.")
+    st.write("Wprowadzasz to tylko raz. Jeśli wpiszesz 'Datę zakończenia', po jej upływie system przestanie pobierać opłatę z Twojego budżetu.")
     
     with st.form("f_zob", clear_on_submit=True):
         st.write("📝 Dodaj nowy stały rachunek (Kontrakt)")
-        nz = st.text_input("Nazwa (np. Czynsz)")
+        nz = st.text_input("Nazwa (np. Czynsz, Rata auta)")
+        
         c_k, c_t = st.columns(2)
         kz = c_k.number_input("Kwota stała", min_value=0.0)
         tz = c_t.selectbox("Typ", ["Subskrypcja", "Koszt Stały", "Rata Kredytu"])
+        
+        c_start, c_end = st.columns(2)
+        # Data rozpoczęcia domyślnie "dzisiaj", Data zakończenia - pusta (opcjonalna)
+        d_start = c_start.date_input("Data rozpoczęcia")
+        d_end = c_end.date_input("Data zakończenia (Opcjonalnie)", value=None)
+        
         if st.form_submit_button("Podpisz umowę"):
             if nz and kz > 0:
-                sh.worksheet("Zobowiazania").append_row([nz, tz, kz])
+                # Zamiana na tekst dla Sheets
+                start_str = d_start.strftime("%Y-%m-%d %H:%M:%S")
+                end_str = d_end.strftime("%Y-%m-%d %H:%M:%S") if d_end else ""
+                
+                # Zabezpieczenie przed starym arkuszem (Google Sheets uzupełni kolumny, jeśli uderzymy w odpowiednie komórki)
+                sh.worksheet("Zobowiazania").append_row([nz, tz, kz, start_str, end_str])
                 st.rerun()
                 
     if not zob_all.empty:
-        ed_z = st.data_editor(zob_all, hide_index=True, num_rows="dynamic", use_container_width=True)
+        # Odpowiednio konfigurujemy kolumny dat do edycji
+        ed_z = st.data_editor(
+            zob_all, 
+            hide_index=True, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            column_config={
+                "Data rozpoczęcia": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                "Data zakończenia": st.column_config.DateColumn(format="YYYY-MM-DD")
+            }
+        )
         if st.button("💾 Zapisz zmiany w rachunkach"): save_df("Zobowiazania", ed_z)
 
 with t4:
