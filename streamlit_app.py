@@ -6,22 +6,23 @@ from datetime import datetime, date
 import calendar
 
 # --- KONFIGURACJA STRONY ---
-st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="collapsed")
+# Zmieniono initial_sidebar_state na "auto", żeby na komputerze był widoczny, a na telefonie miał przycisk
+st.set_page_config(page_title="Midwest Budget PRO", page_icon="🏈", layout="wide", initial_sidebar_state="auto")
 
-# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + INTERSTATE FIX ---
+# --- STYLIZACJA: CHICAGO/DES MOINES + RWD + NAPRAWA MENU ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700;900&family=Oswald:wght@500;700&display=swap');
 
     /* =========================================================
-       UKRYCIE ZNAKÓW WODNYCH I ELEMENTÓW STREAMLIT
+       PRZEZROCZYSTY HEADER (Naprawa braku paska bocznego na telefonie)
        ========================================================= */
     #MainMenu {visibility: hidden;}
-    header {visibility: hidden !important;}
+    [data-testid="stToolbar"] {visibility: hidden;}  /* Ukrywa 3 kropki po prawej */
+    [data-testid="stHeader"] {background-color: transparent;} /* Pasek jest przezroczysty, ale strzałka menu po lewej zostaje! */
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
     
-    /* Poprawka marginesu górnego po usunięciu headera */
     .block-container {
         padding-top: 1rem !important;
     }
@@ -49,7 +50,6 @@ st.markdown("""
         margin-bottom: 2rem;
     }
 
-    /* Nagłówki */
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #c8102e !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #002244 !important; text-transform: uppercase; }
 
@@ -73,22 +73,16 @@ st.markdown("""
     /* =========================================================
        HERO CARDS (Główne Liczniki)
        ========================================================= */
-    /* Karta Zielona (Autostrada ogólna) */
     .hero-card {
         background-color: #006b3d; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; 
         box-shadow: 0 10px 20px rgba(0,0,0,0.4); text-align: center; color: white; margin-bottom: 20px;
     }
     
-    /* KARTA INTERSTATE 80 (Limit Dzienny) */
     .hero-card.interstate {
-        background-color: #003882; /* Niebieski ze znaku drogowego */
-        border: 4px solid #ffffff;
-        border-top: 15px solid #c8102e; /* Czerwony pasek na górze znaku */
-        border-radius: 12px; padding: 20px; 
-        box-shadow: 0 10px 20px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 20px;
+        background-color: #003882; border: 4px solid #ffffff; border-top: 15px solid #c8102e; 
+        border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 20px;
     }
     
-    /* Karta Alarmowa */
     .hero-card.danger { background-color: #c8102e; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; text-align: center; color: white; margin-bottom: 20px; }
 
     .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3.5rem !important; margin: 5px 0; text-shadow: none; font-family: 'Bebas Neue', cursive !important; }
@@ -98,25 +92,11 @@ st.markdown("""
        NAPRAWA METRYK (Wpływy, Koszty, Odkłożono)
        ========================================================= */
     [data-testid="stMetric"] { 
-        background-color: rgba(17, 34, 68, 0.95) !important; /* Ciemny granat */
-        border: 3px solid #c83803 !important; /* Pomarańczowa ramka Bears */
-        border-radius: 12px !important; 
-        padding: 15px !important; 
-        text-align: center !important; 
-        box-shadow: 0 8px 15px rgba(0,0,0,0.8) !important; 
+        background-color: rgba(17, 34, 68, 0.95) !important; border: 3px solid #c83803 !important; 
+        border-radius: 12px !important; padding: 15px !important; text-align: center !important; box-shadow: 0 8px 15px rgba(0,0,0,0.8) !important; 
     }
-    [data-testid="stMetricValue"] div { 
-        font-family: 'Bebas Neue', cursive !important; 
-        color: #ffb612 !important; /* Żółty z Des Moines */
-        font-size: 2.5rem !important; 
-        text-shadow: 2px 2px 4px black !important;
-    }
-    [data-testid="stMetricLabel"] p { 
-        color: #ffffff !important; 
-        font-weight: 700 !important; 
-        text-transform: uppercase !important; 
-        font-family: 'Roboto', sans-serif !important;
-    }
+    [data-testid="stMetricValue"] div { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; font-size: 2.5rem !important; text-shadow: 2px 2px 4px black !important; }
+    [data-testid="stMetricLabel"] p { color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase !important; font-family: 'Roboto', sans-serif !important; }
 
     /* Przycisk */
     .stButton>button {
@@ -222,7 +202,6 @@ if menu == "🏙️ L-Train (Kokpit)":
     with c_h1:
         st.markdown(f"<div class='hero-card'><p>I-80 FUNDS (W PORTFELU)</p><h2>{wolne:,.2f} zł</h2></div>", unsafe_allow_html=True)
     with c_h2:
-        # Klasa Interstate 80 wchodzi do gry
         klasa = "hero-card danger" if dniowka < 50 else "hero-card interstate"
         st.markdown(f"<div class='{klasa}'><p>LIMIT NA DZIEŃ ({pozostalo_dni} DNI)</p><h2>{dniowka:,.2f} zł</h2></div>", unsafe_allow_html=True)
 
