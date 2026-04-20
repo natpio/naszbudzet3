@@ -35,7 +35,7 @@ st.markdown("""
         max-width: 800px;
     }
 
-    /* GLOBALNE KOLORY TEKSTU */
+    /* GLOBAL KOLORY TEKSTU */
     p, label, .stMarkdown p { color: #f8fafc !important; }
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #ffffff !important; text-transform: uppercase; border-bottom: 2px solid #c83803; padding-bottom: 5px; margin-top: 15px; }
@@ -52,7 +52,7 @@ st.markdown("""
     [data-testid="stDataFrame"] span { color: #000000 !important; font-family: 'Roboto', sans-serif; font-weight: 500; }
     div[data-testid="stDataFrameResizable"] { border: 2px solid #003366; border-radius: 10px; }
 
-    /* NOWOCZESNA NAWIGACJA (TABS) */
+    /* NAWIGACJA (TABS) */
     [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
     [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 0.85rem; border-radius: 8px; padding: 8px 10px; border: none; background: transparent; }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
@@ -68,7 +68,7 @@ st.markdown("""
     [data-testid="stFormSubmitButton"]>button p { color: white !important; }
     [data-testid="stForm"] { background-color: rgba(255, 255, 255, 0.05); border: 2px solid #c83803; border-radius: 15px; padding: 20px; }
 
-    /* KARTY Z WYNIKAMI (SCOREBOARDS) */
+    /* KARTY WYNIKÓW */
     .hero-card { background-color: #006b3d; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.5); text-align: center; color: white; margin-bottom: 15px; }
     .hero-card.interstate { background-color: #003882; border: 3px solid #ffffff; border-top: 15px solid #c8102e; border-radius: 15px; padding: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.6); text-align: center; color: white; margin-bottom: 15px; }
     .hero-card.danger { background-color: #c8102e; border: 3px solid #ffffff; border-radius: 15px; padding: 20px; text-align: center; color: white; margin-bottom: 15px; }
@@ -95,7 +95,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- SYSTEM LOGOWANIA Z CIASTECZKAMI (COOKIES) ---
+# --- SYSTEM LOGOWANIA ---
 cookie_manager = stx.CookieManager()
 
 def check_password():
@@ -121,10 +121,6 @@ def check_password():
 
 if not check_password():
     st.stop()
-
-# ==============================================================================
-# OD TEGO MIEJSCA KOD URUCHOMI SIĘ TYLKO DLA ZALOGOWANYCH
-# ==============================================================================
 
 # --- BAZA DANYCH ---
 @st.cache_resource
@@ -202,10 +198,10 @@ wyd_all = load_df("Wydatki")
 zob_all = load_df("Zobowiazania")
 osz_all = load_df("Oszczednosci")
 
-# KATEGORIE WYDATKÓW
+# KATEGORIE
 KATEGORIE = ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"]
 
-# --- WYSKAKUJĄCE OKNA (SMART MODALS) ---
+# --- MODALE ---
 @st.dialog("CO ROBIMY? 🏈")
 def add_operation_modal():
     akcja = st.radio("Wybierz typ operacji:", ["📉 Wydatek (Zakupy)", "📈 Przelew (Wpływ)", "🏦 Konto oszczędnościowe"])
@@ -255,38 +251,23 @@ def close_month_modal(wolne, m_nazwa, rok, m_idx):
     st.markdown(f"<h3 style='text-align: center; color: #ffb612;'>KAPITAŁ: {wolne:.2f} zł</h3>", unsafe_allow_html=True)
     st.write("Podziel zaoszczędzone środki. Ile wrzucamy do Sejfu, a ile przenosimy jako bonus na start kolejnego miesiąca?")
     
-    # Interaktywny suwak podziału środków
     do_sejfu = st.slider("Kwota do SEJFU (zł)", 0.0, float(wolne), float(wolne)/2, step=10.0)
     na_kolejny = float(wolne) - do_sejfu
     
     st.info(f"**Do Sejfu (Oszczędności):** {do_sejfu:.2f} zł\n\n**Na kolejny miesiąc:** {na_kolejny:.2f} zł")
     
     if st.button("ZATWIERDŹ ZAMKNIĘCIE MIESIĄCA", type="primary", use_container_width=True):
-        # Obliczenie pierwszego dnia następnego miesiąca
         next_m = 1 if m_idx == 12 else m_idx + 1
         next_y = rok + 1 if m_idx == 12 else rok
         next_date_str = f"{next_y}-{next_m:02d}-01 00:00:00"
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         sukces = True
-        
         if do_sejfu > 0:
-            s1 = bezpieczny_zapis("Oszczednosci", {
-                "Data": now_str,
-                "Cel": f"Reszta z {m_nazwa} {rok}",
-                "Kwota": float(do_sejfu),
-                "Akcja": "Wpłata",
-                "Typ": "Wpłata"
-            })
+            s1 = bezpieczny_zapis("Oszczednosci", {"Data": now_str, "Cel": f"Reszta z {m_nazwa} {rok}", "Kwota": float(do_sejfu), "Akcja": "Wpłata", "Typ": "Wpłata"})
             sukces = sukces and s1
-            
         if na_kolejny > 0:
-            s2 = bezpieczny_zapis("Przychody", {
-                "Data": next_date_str,
-                "Źródło": f"Zaskórniaki z {m_nazwa} {rok}",
-                "Typ": "Konto",
-                "Kwota": float(na_kolejny)
-            })
+            s2 = bezpieczny_zapis("Przychody", {"Data": next_date_str, "Źródło": f"Zaskórniaki z {m_nazwa} {rok}", "Typ": "Konto", "Kwota": float(na_kolejny)})
             sukces = sukces and s2
             
         if sukces:
@@ -303,6 +284,10 @@ wybrany_rok = c_y.selectbox("ROK:", [2024, 2025, 2026, 2027], index=2)
 m_idx = miesiące.index(wybrany_m_nazwa) + 1
 selected_date = pd.to_datetime(f"{wybrany_rok}-{m_idx:02d}-01")
 
+# OBLICZENIE OSTATNIEGO DNIA WYBRANEGO MIESIĄCA (FIX DLA KOSZTÓW STAŁYCH)
+ostatni_dzien_miesiaca = calendar.monthrange(wybrany_rok, m_idx)[1]
+end_of_month = pd.to_datetime(f"{wybrany_rok}-{m_idx:02d}-{ostatni_dzien_miesiaca} 23:59:59")
+
 st.write("") 
 
 if st.button("➕ DODAJ OPERACJĘ", type="primary"):
@@ -310,7 +295,6 @@ if st.button("➕ DODAJ OPERACJĘ", type="primary"):
 
 st.write("") 
 
-# --- SZEŚĆ ZAKŁADEK ---
 t1, t2, t3, t4, t5, t6 = st.tabs(["🏠 KOKPIT", "📜 WYDATKI", "📥 WPŁYWY", "🏢 STAŁE", "🏦 SEJF", "📊 STATYSTYKI"])
 
 with t1:
@@ -320,12 +304,13 @@ with t1:
     wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
     osz_m = osz_all[osz_all['Data'].dt.strftime("%Y-%m") == m_str] if not osz_all.empty else pd.DataFrame()
     
+    # POPRAWIONE OBLICZANIE KOSZTÓW STAŁYCH
     if not zob_all.empty:
         if 'Data rozpoczęcia' not in zob_all.columns: zob_all['Data rozpoczęcia'] = pd.NaT
         if 'Data zakończenia' not in zob_all.columns: zob_all['Data zakończenia'] = pd.NaT
             
         zob_aktywne = zob_all[
-            ((zob_all['Data rozpoczęcia'] <= selected_date) | (zob_all['Data rozpoczęcia'].isnull())) &
+            ((zob_all['Data rozpoczęcia'] <= end_of_month) | (zob_all['Data rozpoczęcia'].isnull())) &
             ((zob_all['Data zakończenia'] >= selected_date) | (zob_all['Data zakończenia'].isnull()))
         ]
         s_zobowiazania = zob_aktywne['Kwota'].sum()
@@ -338,11 +323,10 @@ with t1:
     
     wolne = s_prz - s_codzienne - s_zobowiazania - w_osz
     
-    ostatni_dzien = calendar.monthrange(wybrany_rok, m_idx)[1]
     dzis = date.today()
-    if dzis.month == m_idx and dzis.year == wybrany_rok: pozostalo_dni = ostatni_dzien - dzis.day + 1
+    if dzis.month == m_idx and dzis.year == wybrany_rok: pozostalo_dni = ostatni_dzien_miesiaca - dzis.day + 1
     elif selected_date.date() < dzis: pozostalo_dni = 0
-    else: pozostalo_dni = ostatni_dzien
+    else: pozostalo_dni = ostatni_dzien_miesiaca
         
     dniowka = wolne / pozostalo_dni if pozostalo_dni > 0 and wolne > 0 else 0
 
@@ -367,9 +351,6 @@ with t2:
     st.markdown("<h3>📜 Historia Wydatków</h3>", unsafe_allow_html=True)
     st.info("💡 **Aby usunąć wydatek:** Zaznacz szary kwadracik po lewej stronie wiersza i kliknij ikonę kosza w prawym górnym rogu tabeli.")
     
-    m_str = selected_date.strftime("%Y-%m")
-    wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
-    
     if not wyd_m.empty:
         ed_w = st.data_editor(
             wyd_m.sort_values("Data", ascending=False), 
@@ -387,9 +368,6 @@ with t2:
 
 with t3:
     st.markdown("<h3>📥 Historia Wpływów</h3>", unsafe_allow_html=True)
-    
-    m_str = selected_date.strftime("%Y-%m")
-    prz_m = prz_all[prz_all['Data'].dt.strftime("%Y-%m") == m_str] if not prz_all.empty else pd.DataFrame()
     
     if not prz_m.empty:
         ed_p = st.data_editor(
@@ -461,9 +439,6 @@ with t5:
 
 with t6:
     st.markdown("<h3>📊 Podsumowanie Kategorii</h3>", unsafe_allow_html=True)
-    
-    m_str = selected_date.strftime("%Y-%m")
-    wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
     
     if not wyd_m.empty and "Kategoria" in wyd_m.columns:
         st.write(f"Struktura Twoich wydatków za **{wybrany_m_nazwa} {wybrany_rok}**:")
