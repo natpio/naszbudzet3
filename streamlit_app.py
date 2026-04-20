@@ -47,14 +47,14 @@ st.markdown("""
     ul[role="listbox"] { background-color: #ffffff !important; }
     ul[role="listbox"] li { color: #000000 !important; font-weight: bold; } 
 
-    /* TABELA DANYCH (TUNING WIZUALNY) */
+    /* TABELA DANYCH */
     [data-testid="stDataFrame"] { background-color: rgba(255, 255, 255, 0.98); border-radius: 12px; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     [data-testid="stDataFrame"] span { color: #000000 !important; font-family: 'Roboto', sans-serif; font-weight: 500; }
     div[data-testid="stDataFrameResizable"] { border: 2px solid #003366; border-radius: 10px; }
 
     /* NOWOCZESNA NAWIGACJA (TABS) */
-    [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; }
-    [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 1rem; border-radius: 8px; padding: 8px 15px; border: none; background: transparent; }
+    [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+    [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 0.95rem; border-radius: 8px; padding: 8px 12px; border: none; background: transparent; }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p { color: white !important; text-shadow: none; }
 
@@ -64,12 +64,7 @@ st.markdown("""
         font-family: 'Bebas Neue', cursive; font-size: 2rem !important; letter-spacing: 2px; padding: 15px !important; box-shadow: 0 10px 20px rgba(200, 56, 3, 0.4); width: 100%; transition: transform 0.2s;
     }
     .stButton>button[kind="primary"]:active { transform: scale(0.95); }
-    
-    /* Naprawa niewidocznego tekstu w przyciskach formualrzy */
-    .stButton>button[kind="secondary"], [data-testid="stFormSubmitButton"]>button { 
-        background-color: #003366 !important; color: white !important; border: 2px solid #ffb612 !important; border-radius: 8px; 
-        font-family: 'Oswald', sans-serif !important; text-transform: uppercase; width: 100%; font-weight: bold; 
-    }
+    .stButton>button[kind="secondary"], [data-testid="stFormSubmitButton"]>button { background-color: #003366 !important; color: white !important; border: 2px solid #ffb612 !important; border-radius: 8px; font-family: 'Oswald', sans-serif !important; text-transform: uppercase; width: 100%; font-weight: bold; }
     [data-testid="stFormSubmitButton"]>button p { color: white !important; }
     [data-testid="stForm"] { background-color: rgba(255, 255, 255, 0.05); border: 2px solid #c83803; border-radius: 15px; padding: 20px; }
 
@@ -93,7 +88,7 @@ st.markdown("""
     /* MOBILE RWD */
     @media (max-width: 768px) {
         .block-container, [data-testid="block-container"] { padding: 15px !important; border-width: 2px !important; margin-top: 0 !important; }
-        [data-testid="stTabs"] [data-baseweb="tab"] { font-size: 0.75rem !important; padding: 10px 5px !important; }
+        [data-testid="stTabs"] [data-baseweb="tab"] { font-size: 0.65rem !important; padding: 8px 3px !important; }
         .hero-card h2, .hero-card.interstate h2 { font-size: 2.2rem !important; }
         .stButton>button[kind="primary"] { font-size: 1.5rem !important; padding: 10px !important;}
     }
@@ -198,7 +193,7 @@ def save_df(sheet_name, df):
                 df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
                 
         sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist(), value_input_option='USER_ENTERED')
-        st.toast(f"Zaktualizowano historię: {sheet_name}!", icon="☁️")
+        st.toast(f"Zaktualizowano chmurę: {sheet_name}!", icon="☁️")
     except Exception as e:
         st.error(f"Błąd przy masowym zapisie: {e}")
 
@@ -218,18 +213,10 @@ def add_operation_modal():
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         
         if st.button("Zanotuj Wydatek", use_container_width=True):
-            if k <= 0:
-                st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
-            elif not n:
-                st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
+            if k <= 0: st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
+            elif not n: st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
             else:
-                sukces = bezpieczny_zapis("Wydatki", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Nazwa": n,
-                    "Kategoria": "Codzienne",
-                    "Kwota": float(k)
-                })
-                if sukces:
+                if bezpieczny_zapis("Wydatki", {"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nazwa": n, "Kategoria": "Codzienne", "Kwota": float(k)}):
                     st.success("✅ Wysłano do bazy! Zaraz odświeżę...")
                     time.sleep(1)
                     st.rerun()
@@ -241,13 +228,7 @@ def add_operation_modal():
             if kw <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
             elif not z: st.warning("⚠️ Wpisz źródło przelewu.")
             else:
-                sukces = bezpieczny_zapis("Przychody", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Źródło": z,
-                    "Typ": "Konto",
-                    "Kwota": float(kw)
-                })
-                if sukces:
+                if bezpieczny_zapis("Przychody", {"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Źródło": z, "Typ": "Konto", "Kwota": float(kw)}):
                     st.success("✅ Zaksięgowano! Zaraz odświeżę...")
                     time.sleep(1)
                     st.rerun()
@@ -260,14 +241,7 @@ def add_operation_modal():
             if kwo <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
             elif not cl: st.warning("⚠️ Podaj cel.")
             else:
-                sukces = bezpieczny_zapis("Oszczednosci", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Cel": cl,
-                    "Kwota": float(kwo),
-                    "Akcja": typ_osz, 
-                    "Typ": typ_osz 
-                })
-                if sukces:
+                if bezpieczny_zapis("Oszczednosci", {"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Cel": cl, "Kwota": float(kwo), "Akcja": typ_osz, "Typ": typ_osz }):
                     st.success("✅ Sejf zaktualizowany! Zaraz odświeżę...")
                     time.sleep(1)
                     st.rerun()
@@ -288,7 +262,8 @@ if st.button("➕ DODAJ OPERACJĘ", type="primary"):
 
 st.write("") 
 
-t1, t2, t3, t4 = st.tabs(["🏠 KOKPIT", "📜 HISTORIA", "🏢 KOSZTY STAŁE", "🏦 KONTO OSZCZĘDNOŚCIOWE"])
+# --- PIĘĆ ZAKŁADEK ---
+t1, t2, t3, t4, t5 = st.tabs(["🏠 KOKPIT", "📜 WYDATKI", "📥 WPŁYWY", "🏢 KOSZTY STAŁE", "🏦 SEJF"])
 
 with t1:
     m_str = selected_date.strftime("%Y-%m")
@@ -334,7 +309,7 @@ with t1:
     cm3.metric("Wpłata na oszczędności", f"{w_osz:,.2f} zł")
 
 with t2:
-    st.markdown("<h3>📜 Historia Codziennych Wydatków</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>📜 Historia Wydatków</h3>", unsafe_allow_html=True)
     st.info("💡 **Aby usunąć wydatek:** Zaznacz szary kwadracik po lewej stronie wiersza i kliknij ikonę kosza w prawym górnym rogu tabeli.")
     
     m_str = selected_date.strftime("%Y-%m")
@@ -343,9 +318,7 @@ with t2:
     if not wyd_m.empty:
         ed_w = st.data_editor(
             wyd_m.sort_values("Data", ascending=False), 
-            hide_index=True, 
-            num_rows="dynamic", 
-            use_container_width=True,
+            hide_index=True, num_rows="dynamic", use_container_width=True,
             column_config={
                 "Data": st.column_config.DatetimeColumn("Kiedy? 🕒", format="YYYY-MM-DD HH:mm"),
                 "Nazwa": st.column_config.TextColumn("Co kupiono? 🛒"),
@@ -355,11 +328,34 @@ with t2:
         )
         if st.button("💾 Zapisz korektę wydatków"): save_df("Wydatki", ed_w)
     else:
-        st.info("Brak wydatków w tym miesiącu. Użyj przycisku DODAJ OPERACJĘ na górze.")
+        st.info("Brak wydatków w tym miesiącu.")
 
+# --- NOWA ZAKŁADKA WPŁYWY (PRZYCHODY) ---
 with t3:
+    st.markdown("<h3>📥 Historia Wpływów</h3>", unsafe_allow_html=True)
+    st.info("💡 **Aby usunąć wpływ:** Zaznacz szary kwadracik po lewej stronie wiersza i kliknij ikonę kosza.")
+    
+    m_str = selected_date.strftime("%Y-%m")
+    prz_m = prz_all[prz_all['Data'].dt.strftime("%Y-%m") == m_str] if not prz_all.empty else pd.DataFrame()
+    
+    if not prz_m.empty:
+        ed_p = st.data_editor(
+            prz_m.sort_values("Data", ascending=False), 
+            hide_index=True, num_rows="dynamic", use_container_width=True,
+            column_config={
+                "Data": st.column_config.DatetimeColumn("Kiedy? 🕒", format="YYYY-MM-DD HH:mm"),
+                "Źródło": st.column_config.TextColumn("Od kogo? 💼"),
+                "Typ": st.column_config.SelectboxColumn("Gdzie?", options=["Konto", "Gotówka"]),
+                "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł")
+            }
+        )
+        if st.button("💾 Zapisz korektę wpływów"): save_df("Przychody", ed_p)
+    else:
+        st.info("Brak wpływów w tym miesiącu.")
+
+with t4:
     st.markdown("<h3>🏢 Koszty Stałe (Zobowiązania)</h3>", unsafe_allow_html=True)
-    st.info("💡 **Aby usunąć rachunek:** Zaznacz szary kwadracik obok nazwy i kliknij ikonę kosza na górze tabeli.")
+    st.info("💡 **Aby usunąć rachunek:** Zaznacz szary kwadracik obok nazwy i kliknij ikonę kosza.")
     
     with st.form("f_zob", clear_on_submit=True):
         st.write("📝 **Nowy Koszt Stały** (Np. Abonament, który pobiera się sam)")
@@ -382,10 +378,7 @@ with t3:
                 
     if not zob_all.empty:
         ed_z = st.data_editor(
-            zob_all, 
-            hide_index=True, 
-            num_rows="dynamic", 
-            use_container_width=True,
+            zob_all, hide_index=True, num_rows="dynamic", use_container_width=True,
             column_config={ 
                 "Nazwa": st.column_config.TextColumn("Nazwa Rachunku 🧾"),
                 "Typ": st.column_config.SelectboxColumn("Typ", options=["Subskrypcja", "Koszt Stały", "Rata Kredytu"]),
@@ -396,22 +389,19 @@ with t3:
         )
         if st.button("💾 Zapisz zmiany w kosztach stałych"): save_df("Zobowiazania", ed_z)
 
-with t4:
+with t5:
     st.markdown("<h3>🏦 Konto Oszczędnościowe</h3>", unsafe_allow_html=True)
     st.write("Aby dodać lub wypłacić środki, użyj pomarańczowego przycisku DODAJ OPERACJĘ na górze.")
     
     if not osz_all.empty:
         ed_o = st.data_editor(
-            osz_all.sort_values("Data", ascending=False), 
-            hide_index=True, 
-            num_rows="dynamic", 
-            use_container_width=True,
+            osz_all.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True,
             column_config={
                 "Data": st.column_config.DatetimeColumn("Kiedy?", format="YYYY-MM-DD HH:mm"),
                 "Cel": st.column_config.TextColumn("Cel 🎯"),
                 "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł"),
                 "Akcja": st.column_config.SelectboxColumn("Operacja", options=["Wpłata", "Wypłata"]),
-                "Typ": None # Ukrywamy techniczną kolumnę z widoku, żeby nie było śmietnika
+                "Typ": None 
             }
         )
         if st.button("💾 Zapisz korekty w oszczędnościach"): save_df("Oszczednosci", ed_o)
