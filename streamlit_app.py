@@ -212,7 +212,7 @@ def add_operation_modal():
     st.write("---")
     
     if "Wydatek" in akcja:
-        n = st.text_input("Na co wydałeś?")
+        n = st.text_input("Na co wydane?")
         kat = st.selectbox("Kategoria", KATEGORIE)
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         
