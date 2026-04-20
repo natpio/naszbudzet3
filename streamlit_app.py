@@ -141,7 +141,7 @@ def init_connection():
 
 sh = init_connection()
 
-# ULEPSZONY SYSTEM ODCZYTU Z ABOSLUTNĄ KONTROLĄ FORMATU
+# ULEPSZONY SYSTEM ODCZYTU
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
@@ -158,7 +158,7 @@ def load_df(sheet_name):
     except Exception: 
         return pd.DataFrame()
 
-# NUKLEARNY SYSTEM ZAPISU (CZYŚCI ARKUSZ I WGRYWA OD NOWA, OMIJAJĄC UKRYTE WIERSZE)
+# NUKLEARNY SYSTEM ZAPISU Z NAPRAWIONYM FORMATOWANIEM DATY
 def bezpieczny_zapis(sheet_name, dane_dict):
     try:
         # Wczytaj obecne dane
@@ -179,6 +179,8 @@ def bezpieczny_zapis(sheet_name, dane_dict):
         
         for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
             if col in df_final.columns:
+                # FIX: Wymuszamy obiekt datetime przed próbą formatowania, żeby zabić błąd "str object has no attribute strftime"
+                df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
                 df_final[col] = df_final[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
                 
         sheet.update([df_final.columns.values.tolist()] + df_final.fillna("").values.tolist(), value_input_option='USER_ENTERED')
@@ -187,7 +189,7 @@ def bezpieczny_zapis(sheet_name, dane_dict):
         st.error(f"Krytyczny błąd zapisu: {e}")
         return False
 
-# ZWYKŁY ZAPIS DLA TABEL (Edycja)
+# ZWYKŁY ZAPIS DLA TABEL (Edycja) Z NAPRAWIONYM FORMATOWANIEM DATY
 def save_df(sheet_name, df):
     try:
         sheet = sh.worksheet(sheet_name)
@@ -195,7 +197,10 @@ def save_df(sheet_name, df):
         df_save = df.copy()
         for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
             if col in df_save.columns:
+                # FIX W EDYCJI TEŻ: Wymuszamy obiekt datetime
+                df_save[col] = pd.to_datetime(df_save[col], errors='coerce')
                 df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+                
         sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist(), value_input_option='USER_ENTERED')
         st.toast(f"Zaktualizowano historię: {sheet_name}!", icon="☁️")
     except Exception as e:
