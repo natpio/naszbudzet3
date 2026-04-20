@@ -28,7 +28,7 @@ st.markdown("""
 
     /* GŁÓWNY KONTENER (MOCNA TARCZA OCHRONNA DLA TEKSTU) */
     .block-container, [data-testid="block-container"] {
-        background-color: rgba(0, 21, 43, 0.95) !important; /* Bardzo ciemny granat, prawie solidny */
+        background-color: rgba(0, 21, 43, 0.95) !important; 
         padding: 30px !important; border-radius: 20px; border: 4px solid #c83803; 
         margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         max-width: 800px;
@@ -36,23 +36,21 @@ st.markdown("""
 
     /* GLOBALNE KOLORY TEKSTU */
     p, label, .stMarkdown p { color: #f8fafc !important; }
-    span { color: inherit; } /* Usunięto globalne wymuszenie dla span, by nie psuć dropdownów */
-    
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #ffffff !important; text-transform: uppercase; border-bottom: 2px solid #c83803; padding-bottom: 5px; margin-top: 15px; }
     
     /* NAPRAWA PÓŁ WPROWADZANIA I ROZWIJANYCH LIST (DROPDOWN) */
     input { color: #000000 !important; font-weight: bold; }
     div[data-baseweb="select"] { background-color: #ffffff !important; border-radius: 6px; }
-    div[data-baseweb="select"] span { color: #000000 !important; font-weight: bold; } /* Tekst na zamkniętej liście */
+    div[data-baseweb="select"] span { color: #000000 !important; font-weight: bold; } 
     ul[role="listbox"] { background-color: #ffffff !important; }
-    ul[role="listbox"] li { color: #000000 !important; font-weight: bold; } /* Tekst na rozwiniętej liście */
+    ul[role="listbox"] li { color: #000000 !important; font-weight: bold; } 
 
     /* TABELA DANYCH */
     [data-testid="stDataFrame"] { background-color: rgba(255, 255, 255, 0.95); border-radius: 8px; padding: 5px; }
-    [data-testid="stDataFrame"] span { color: #000000 !important; } /* Tekst w tabelach musi być ciemny */
+    [data-testid="stDataFrame"] span { color: #000000 !important; }
 
-    /* NOWOCZESNA NAWIGACJA (TABS) - TERAZ CZYTELNA */
+    /* NOWOCZESNA NAWIGACJA (TABS) */
     [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; }
     [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 1rem; border-radius: 8px; padding: 8px 15px; border: none; background: transparent; }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
@@ -103,7 +101,6 @@ def check_password():
     if auth_cookie == "granted" or st.session_state.get("password_correct"):
         return True
 
-    # Zabezpieczony kontener wizualny dla ekranu logowania
     st.markdown("<div style='background-color: rgba(0, 34, 68, 0.95); padding: 30px; border-radius: 15px; border: 2px solid #ffb612; text-align: center;'>", unsafe_allow_html=True)
     st.markdown("<h1 style='color: #ffb612;'>🔒 IDENTYFIKACJA</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color: white;'>Wpisz hasło, aby odblokować aplikację. Sesja trwa 30 dni.</p>", unsafe_allow_html=True)
@@ -144,6 +141,22 @@ def init_connection():
 
 sh = init_connection()
 
+# NOWA KULOODPORNA FUNKCJA DO ZAPISU - IGNORUJE ŚMIECI W ARKUSZU!
+def bezpieczny_zapis(sheet_name, dane_dict):
+    ws = sh.worksheet(sheet_name)
+    naglowki = ws.row_values(1)
+    
+    # Skanuje arkusz i dopasowuje wartości dokładnie do nazw kolumn
+    if naglowki:
+        nowy_wiersz = ["" for _ in naglowki]
+        for klucz, wartosc in dane_dict.items():
+            if klucz in naglowki:
+                nowy_wiersz[naglowki.index(klucz)] = wartosc
+        ws.append_row(nowy_wiersz)
+    else:
+        # Jeśli arkusz jest zupełnie pusty (brak nagłówków), wklej awaryjnie wartości
+        ws.append_row(list(dane_dict.values()))
+
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
@@ -163,7 +176,7 @@ def save_df(sheet_name, df):
             df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
             
     sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
-    st.toast(f"Zapisano w chmurze: {sheet_name}!", icon="☁️")
+    st.toast(f"Zaktualizowano w chmurze: {sheet_name}!", icon="☁️")
 
 prz_all = load_df("Przychody")
 wyd_all = load_df("Wydatki")
@@ -181,7 +194,13 @@ def add_operation_modal():
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         if st.button("Zanotuj Wydatek", use_container_width=True):
             if k > 0 and n:
-                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), n, "Codzienne", k])
+                # Strzelamy laserowo tylko w te 4 kolumny!
+                bezpieczny_zapis("Wydatki", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Nazwa": n,
+                    "Kategoria": "Codzienne",
+                    "Kwota": k
+                })
                 st.rerun()
 
     elif "Przelew" in akcja:
@@ -189,7 +208,12 @@ def add_operation_modal():
         kw = st.number_input("Wpływ (zł)", min_value=0.0)
         if st.button("Zaksięguj Przelew", use_container_width=True):
             if z and kw > 0:
-                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
+                bezpieczny_zapis("Przychody", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Źródło": z,
+                    "Typ": "Konto",
+                    "Kwota": kw
+                })
                 st.rerun()
 
     elif "Konto oszczędnościowe" in akcja:
@@ -198,7 +222,14 @@ def add_operation_modal():
         typ_osz = st.selectbox("Typ", ["Wpłata", "Wypłata"])
         if st.button("Zatwierdź w oszczędnościach", use_container_width=True):
             if cl and kwo > 0:
-                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cl, kwo, typ_osz])
+                # Wysłanie "Akcja" i "Typ" zabezpiecza przed starymi nazwami kolumn w Twoim arkuszu
+                bezpieczny_zapis("Oszczednosci", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Cel": cl,
+                    "Kwota": kwo,
+                    "Akcja": typ_osz, 
+                    "Typ": typ_osz 
+                })
                 st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
@@ -217,7 +248,6 @@ if st.button("➕ DODAJ OPERACJĘ", type="primary"):
 
 st.write("") 
 
-# ZMIENIONE NAZWY ZAKŁADEK (JASNE I CZYTELNE)
 t1, t2, t3, t4 = st.tabs(["🏠 KOKPIT", "📜 HISTORIA", "🏢 KOSZTY STAŁE", "🏦 KONTO OSZCZĘDNOŚCIOWE"])
 
 with t1:
@@ -260,7 +290,6 @@ with t1:
 
     cm1, cm2, cm3 = st.columns(3)
     cm1.metric("Wpływy w miesiącu", f"{s_prz:,.2f} zł")
-    # ZMIENIONE NAZWY METRYK
     cm2.metric("Koszty Stałe", f"{s_zobowiazania:,.2f} zł")
     cm3.metric("Wpłata na oszczędności", f"{w_osz:,.2f} zł")
 
@@ -274,7 +303,7 @@ with t2:
         ed_w = st.data_editor(wyd_m.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
         if st.button("💾 Zapisz korektę wydatków"): save_df("Wydatki", ed_w)
     else:
-        st.info("Brak wydatków w tym miesiącu. Użyj przycisku DODAJ OPERACJĘ.")
+        st.info("Brak wydatków w tym miesiącu. Użyj przycisku DODAJ OPERACJĘ na górze.")
 
 with t3:
     st.markdown("<h3>🏢 Koszty Stałe (Zobowiązania)</h3>", unsafe_allow_html=True)
@@ -295,7 +324,13 @@ with t3:
             if nz and kz > 0:
                 start_str = d_start.strftime("%Y-%m-%d %H:%M:%S")
                 end_str = d_end.strftime("%Y-%m-%d %H:%M:%S") if d_end else ""
-                sh.worksheet("Zobowiazania").append_row([nz, tz, kz, start_str, end_str])
+                bezpieczny_zapis("Zobowiazania", {
+                    "Nazwa": nz,
+                    "Typ": tz,
+                    "Kwota": kz,
+                    "Data rozpoczęcia": start_str,
+                    "Data zakończenia": end_str
+                })
                 st.rerun()
                 
     if not zob_all.empty:
