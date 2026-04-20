@@ -26,7 +26,7 @@ st.markdown("""
         font-family: 'Roboto', sans-serif;
     }
 
-    /* GŁÓWNY KONTENER (MOCNA TARCZA OCHRONNA DLA TEKSTU) */
+    /* GŁÓWNY KONTENER */
     .block-container, [data-testid="block-container"] {
         background-color: rgba(0, 21, 43, 0.95) !important; 
         padding: 30px !important; border-radius: 20px; border: 4px solid #c83803; 
@@ -39,7 +39,7 @@ st.markdown("""
     h1, h2 { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; text-transform: uppercase; letter-spacing: 2px; }
     h3 { font-family: 'Oswald', sans-serif !important; color: #ffffff !important; text-transform: uppercase; border-bottom: 2px solid #c83803; padding-bottom: 5px; margin-top: 15px; }
     
-    /* NAPRAWA PÓŁ WPROWADZANIA I ROZWIJANYCH LIST (DROPDOWN) */
+    /* INPUTY I DROPDOWNY */
     input { color: #000000 !important; font-weight: bold; }
     div[data-baseweb="select"] { background-color: #ffffff !important; border-radius: 6px; }
     div[data-baseweb="select"] span { color: #000000 !important; font-weight: bold; } 
@@ -56,7 +56,7 @@ st.markdown("""
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p { color: white !important; text-shadow: none; }
 
-    /* WIELKI PRZYCISK DODAWANIA */
+    /* PRZYCISKI */
     .stButton>button[kind="primary"] {
         background: linear-gradient(90deg, #c83803 0%, #ff5722 100%); color: white !important; border: none; border-radius: 30px;
         font-family: 'Bebas Neue', cursive; font-size: 2rem !important; letter-spacing: 2px; padding: 15px !important; box-shadow: 0 10px 20px rgba(200, 56, 3, 0.4); width: 100%; transition: transform 0.2s;
@@ -72,12 +72,12 @@ st.markdown("""
     .hero-card h2, .hero-card.interstate h2, .hero-card.danger h2 { color: #ffffff !important; font-size: 3rem !important; margin: 0; font-family: 'Bebas Neue', cursive !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     .hero-card p, .hero-card.interstate p, .hero-card.danger p { font-weight: 900; font-size: 1rem; text-transform: uppercase; margin: 0 0 5px 0; font-family: 'Roboto', sans-serif !important; opacity: 0.9; }
 
-    /* Metryki */
+    /* METRYKI */
     [data-testid="stMetric"] { background-color: #111 !important; border: 2px solid #ffb612 !important; border-radius: 10px !important; padding: 15px !important; text-align: center !important; }
     [data-testid="stMetricValue"] div { font-family: 'Bebas Neue', cursive !important; color: #ffb612 !important; font-size: 2rem !important; }
     [data-testid="stMetricLabel"] p { color: #ffffff !important; font-weight: 700 !important; text-transform: uppercase !important; font-family: 'Roboto', sans-serif !important; font-size: 0.8rem !important; opacity: 1 !important;}
 
-    /* Modale */
+    /* MODALE */
     div[role="dialog"] { background-color: #00152b !important; border: 4px solid #c83803; border-radius: 15px; }
     div[role="dialog"] h2 { color: #ffb612 !important; text-align: center; font-family: 'Bebas Neue', cursive !important; }
     div[role="dialog"] p, div[role="dialog"] label { color: white !important; }
@@ -97,7 +97,6 @@ cookie_manager = stx.CookieManager()
 
 def check_password():
     auth_cookie = cookie_manager.get(cookie="midwest_auth")
-    
     if auth_cookie == "granted" or st.session_state.get("password_correct"):
         return True
 
@@ -136,47 +135,59 @@ def init_connection():
         )
         return gspread.authorize(credentials).open_by_url(creds["spreadsheet"])
     except Exception as e:
-        st.error(f"Błąd silnika: {e}")
+        st.error(f"Błąd połączenia: {e}")
         return None
 
 sh = init_connection()
 
-# NOWA KULOODPORNA FUNKCJA DO ZAPISU - IGNORUJE ŚMIECI W ARKUSZU!
 def bezpieczny_zapis(sheet_name, dane_dict):
-    ws = sh.worksheet(sheet_name)
-    naglowki = ws.row_values(1)
-    
-    # Skanuje arkusz i dopasowuje wartości dokładnie do nazw kolumn
-    if naglowki:
-        nowy_wiersz = ["" for _ in naglowki]
-        for klucz, wartosc in dane_dict.items():
-            if klucz in naglowki:
-                nowy_wiersz[naglowki.index(klucz)] = wartosc
-        ws.append_row(nowy_wiersz)
-    else:
-        # Jeśli arkusz jest zupełnie pusty (brak nagłówków), wklej awaryjnie wartości
-        ws.append_row(list(dane_dict.values()))
+    """Zapisuje dane inteligentnie i zwraca True w przypadku sukcesu, uodparnia na błędy w GSheets"""
+    try:
+        ws = sh.worksheet(sheet_name)
+        naglowki = ws.row_values(1)
+        if naglowki:
+            nowy_wiersz = ["" for _ in naglowki]
+            for klucz, wartosc in dane_dict.items():
+                if klucz in naglowki:
+                    nowy_wiersz[naglowki.index(klucz)] = wartosc
+            # value_input_option='USER_ENTERED' wymusza poprawne formatowanie liczb i dat przez Arkusz Google
+            ws.append_row(nowy_wiersz, value_input_option='USER_ENTERED')
+        else:
+            ws.append_row(list(dane_dict.values()), value_input_option='USER_ENTERED')
+        return True
+    except Exception as e:
+        st.error(f"Krytyczny błąd zapisu w Google Sheets: {e}")
+        return False
 
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
         if not df.empty:
+            # Wymuszenie konwersji wszystkich kolumn z kwotami (naprawia problem z polskimi przecinkami)
+            for col in df.columns:
+                if 'kwota' in col.lower() or 'koszt' in col.lower():
+                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace(' ', ''), errors='coerce').fillna(0)
+            # Konwersja dat
             for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors='coerce') 
         return df
-    except: return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Nie mogłem wczytać arkusza '{sheet_name}': {e}")
+        return pd.DataFrame()
 
 def save_df(sheet_name, df):
-    sheet = sh.worksheet(sheet_name)
-    sheet.clear()
-    df_save = df.copy()
-    for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
-        if col in df_save.columns:
-            df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
-            
-    sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist())
-    st.toast(f"Zaktualizowano w chmurze: {sheet_name}!", icon="☁️")
+    try:
+        sheet = sh.worksheet(sheet_name)
+        sheet.clear()
+        df_save = df.copy()
+        for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
+            if col in df_save.columns:
+                df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+        sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist(), value_input_option='USER_ENTERED')
+        st.toast(f"Zaktualizowano chmurę: {sheet_name}!", icon="☁️")
+    except Exception as e:
+        st.error(f"Błąd przy masowym zapisie: {e}")
 
 prz_all = load_df("Przychody")
 wyd_all = load_df("Wydatki")
@@ -192,45 +203,54 @@ def add_operation_modal():
     if "Wydatek" in akcja:
         n = st.text_input("Na co wydałeś?")
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
+        
         if st.button("Zanotuj Wydatek", use_container_width=True):
-            if k > 0 and n:
-                # Strzelamy laserowo tylko w te 4 kolumny!
-                bezpieczny_zapis("Wydatki", {
+            if k <= 0:
+                st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
+            elif not n:
+                st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
+            else:
+                sukces = bezpieczny_zapis("Wydatki", {
                     "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "Nazwa": n,
                     "Kategoria": "Codzienne",
-                    "Kwota": k
+                    "Kwota": float(k)
                 })
-                st.rerun()
+                if sukces:
+                    st.session_state['operation_saved'] = True
+                    st.rerun()
 
     elif "Przelew" in akcja:
         z = st.text_input("Od kogo wpłynęło?")
-        kw = st.number_input("Wpływ (zł)", min_value=0.0)
+        kw = st.number_input("Wpływ (zł)", min_value=0.0, step=1.0)
         if st.button("Zaksięguj Przelew", use_container_width=True):
-            if z and kw > 0:
-                bezpieczny_zapis("Przychody", {
+            if kw <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
+            elif not z: st.warning("⚠️ Wpisz źródło przelewu.")
+            else:
+                sukces = bezpieczny_zapis("Przychody", {
                     "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "Źródło": z,
                     "Typ": "Konto",
-                    "Kwota": kw
+                    "Kwota": float(kw)
                 })
-                st.rerun()
+                if sukces: st.rerun()
 
     elif "Konto oszczędnościowe" in akcja:
         cl = st.text_input("Cel oszczędzania:")
-        kwo = st.number_input("Podaj kwotę (zł)", min_value=0.0)
+        kwo = st.number_input("Podaj kwotę (zł)", min_value=0.0, step=1.0)
         typ_osz = st.selectbox("Typ", ["Wpłata", "Wypłata"])
         if st.button("Zatwierdź w oszczędnościach", use_container_width=True):
-            if cl and kwo > 0:
-                # Wysłanie "Akcja" i "Typ" zabezpiecza przed starymi nazwami kolumn w Twoim arkuszu
-                bezpieczny_zapis("Oszczednosci", {
+            if kwo <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
+            elif not cl: st.warning("⚠️ Podaj cel.")
+            else:
+                sukces = bezpieczny_zapis("Oszczednosci", {
                     "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "Cel": cl,
-                    "Kwota": kwo,
+                    "Kwota": float(kwo),
                     "Akcja": typ_osz, 
                     "Typ": typ_osz 
                 })
-                st.rerun()
+                if sukces: st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
 c_m, c_y = st.columns(2)
