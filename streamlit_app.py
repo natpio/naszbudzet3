@@ -205,7 +205,7 @@ osz_all = load_df("Oszczednosci")
 # KATEGORIE WYDATKÓW
 KATEGORIE = ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"]
 
-# --- WYSKAKUJĄCE OKNO (SMART MODAL) ---
+# --- WYSKAKUJĄCE OKNA (SMART MODALS) ---
 @st.dialog("CO ROBIMY? 🏈")
 def add_operation_modal():
     akcja = st.radio("Wybierz typ operacji:", ["📉 Wydatek (Zakupy)", "📈 Przelew (Wpływ)", "🏦 Konto oszczędnościowe"])
@@ -249,6 +249,50 @@ def add_operation_modal():
                     st.success("✅ Sejf zaktualizowany! Zaraz odświeżę...")
                     time.sleep(1)
                     st.rerun()
+
+@st.dialog("ZAMKNIĘCIE MIESIĄCA 📆")
+def close_month_modal(wolne, m_nazwa, rok, m_idx):
+    st.markdown(f"<h3 style='text-align: center; color: #ffb612;'>KAPITAŁ: {wolne:.2f} zł</h3>", unsafe_allow_html=True)
+    st.write("Podziel zaoszczędzone środki. Ile wrzucamy do Sejfu, a ile przenosimy jako bonus na start kolejnego miesiąca?")
+    
+    # Interaktywny suwak podziału środków
+    do_sejfu = st.slider("Kwota do SEJFU (zł)", 0.0, float(wolne), float(wolne)/2, step=10.0)
+    na_kolejny = float(wolne) - do_sejfu
+    
+    st.info(f"**Do Sejfu (Oszczędności):** {do_sejfu:.2f} zł\n\n**Na kolejny miesiąc:** {na_kolejny:.2f} zł")
+    
+    if st.button("ZATWIERDŹ ZAMKNIĘCIE MIESIĄCA", type="primary", use_container_width=True):
+        # Obliczenie pierwszego dnia następnego miesiąca
+        next_m = 1 if m_idx == 12 else m_idx + 1
+        next_y = rok + 1 if m_idx == 12 else rok
+        next_date_str = f"{next_y}-{next_m:02d}-01 00:00:00"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        sukces = True
+        
+        if do_sejfu > 0:
+            s1 = bezpieczny_zapis("Oszczednosci", {
+                "Data": now_str,
+                "Cel": f"Reszta z {m_nazwa} {rok}",
+                "Kwota": float(do_sejfu),
+                "Akcja": "Wpłata",
+                "Typ": "Wpłata"
+            })
+            sukces = sukces and s1
+            
+        if na_kolejny > 0:
+            s2 = bezpieczny_zapis("Przychody", {
+                "Data": next_date_str,
+                "Źródło": f"Zaskórniaki z {m_nazwa} {rok}",
+                "Typ": "Konto",
+                "Kwota": float(na_kolejny)
+            })
+            sukces = sukces and s2
+            
+        if sukces:
+            st.success("Miesiąc zamknięty mistrzowsko! 🏆 Zaraz odświeżę...")
+            time.sleep(1.5)
+            st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
 c_m, c_y = st.columns(2)
@@ -311,6 +355,13 @@ with t1:
     cm1.metric("Wpływy w miesiącu", f"{s_prz:,.2f} zł")
     cm2.metric("Koszty Stałe", f"{s_zobowiazania:,.2f} zł")
     cm3.metric("Wpłata na oszczędności", f"{w_osz:,.2f} zł")
+
+    st.write("---")
+    if wolne > 0:
+        if st.button("🔒 ZAMKNIJ MIESIĄC (Podziel resztę)", type="secondary"):
+            close_month_modal(wolne, wybrany_m_nazwa, wybrany_rok, m_idx)
+    else:
+        st.info("💡 Brak wolnych środków do przeniesienia na koniec tego miesiąca.")
 
 with t2:
     st.markdown("<h3>📜 Historia Wydatków</h3>", unsafe_allow_html=True)
@@ -408,7 +459,6 @@ with t5:
     else:
         st.info("Brak środków na koncie oszczędnościowym.")
 
-# --- NOWA ZAKŁADKA STATYSTYKI ---
 with t6:
     st.markdown("<h3>📊 Podsumowanie Kategorii</h3>", unsafe_allow_html=True)
     
@@ -418,14 +468,11 @@ with t6:
     if not wyd_m.empty and "Kategoria" in wyd_m.columns:
         st.write(f"Struktura Twoich wydatków za **{wybrany_m_nazwa} {wybrany_rok}**:")
         
-        # Agregacja wydatków po kategorii
         suma_kat = wyd_m.groupby("Kategoria")["Kwota"].sum().reset_index()
         suma_kat = suma_kat.sort_values(by="Kwota", ascending=False)
         
-        # Wykres słupkowy z pomarańczowym kolorem
         st.bar_chart(suma_kat.set_index("Kategoria"), color="#ffb612")
         
-        # Tabela z precyzyjnymi danymi
         st.dataframe(
             suma_kat, 
             hide_index=True, 
