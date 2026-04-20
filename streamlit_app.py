@@ -4,6 +4,7 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime, date
 import calendar
+import time
 import extra_streamlit_components as stx
 
 # --- KONFIGURACJA STRONY ---
@@ -140,42 +141,53 @@ def init_connection():
 
 sh = init_connection()
 
-def bezpieczny_zapis(sheet_name, dane_dict):
-    """Zapisuje dane inteligentnie i zwraca True w przypadku sukcesu, uodparnia na błędy w GSheets"""
-    try:
-        ws = sh.worksheet(sheet_name)
-        naglowki = ws.row_values(1)
-        if naglowki:
-            nowy_wiersz = ["" for _ in naglowki]
-            for klucz, wartosc in dane_dict.items():
-                if klucz in naglowki:
-                    nowy_wiersz[naglowki.index(klucz)] = wartosc
-            # value_input_option='USER_ENTERED' wymusza poprawne formatowanie liczb i dat przez Arkusz Google
-            ws.append_row(nowy_wiersz, value_input_option='USER_ENTERED')
-        else:
-            ws.append_row(list(dane_dict.values()), value_input_option='USER_ENTERED')
-        return True
-    except Exception as e:
-        st.error(f"Krytyczny błąd zapisu w Google Sheets: {e}")
-        return False
-
+# ULEPSZONY SYSTEM ODCZYTU Z ABOSLUTNĄ KONTROLĄ FORMATU
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
         if not df.empty:
-            # Wymuszenie konwersji wszystkich kolumn z kwotami (naprawia problem z polskimi przecinkami)
+            df.columns = df.columns.str.strip() # ZABÓJCA SPACJI W NAGŁÓWKACH
             for col in df.columns:
                 if 'kwota' in col.lower() or 'koszt' in col.lower():
+                    # Zabezpieczenie przed polskimi przecinkami z arkuszy
                     df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace(' ', ''), errors='coerce').fillna(0)
-            # Konwersja dat
             for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors='coerce') 
         return df
-    except Exception as e:
-        st.error(f"Nie mogłem wczytać arkusza '{sheet_name}': {e}")
+    except Exception: 
         return pd.DataFrame()
 
+# NUKLEARNY SYSTEM ZAPISU (CZYŚCI ARKUSZ I WGRYWA OD NOWA, OMIJAJĄC UKRYTE WIERSZE)
+def bezpieczny_zapis(sheet_name, dane_dict):
+    try:
+        # Wczytaj obecne dane
+        df = load_df(sheet_name)
+        
+        # Stwórz wiersz z nowymi danymi
+        nowy_wiersz = pd.DataFrame([dane_dict])
+        
+        # Połącz stare z nowym
+        if df.empty:
+            df_final = nowy_wiersz
+        else:
+            df_final = pd.concat([df, nowy_wiersz], ignore_index=True)
+            
+        # Zapisz całość od zera (to niszczy "niewidzialne" wiersze)
+        sheet = sh.worksheet(sheet_name)
+        sheet.clear()
+        
+        for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
+            if col in df_final.columns:
+                df_final[col] = df_final[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+                
+        sheet.update([df_final.columns.values.tolist()] + df_final.fillna("").values.tolist(), value_input_option='USER_ENTERED')
+        return True
+    except Exception as e:
+        st.error(f"Krytyczny błąd zapisu: {e}")
+        return False
+
+# ZWYKŁY ZAPIS DLA TABEL (Edycja)
 def save_df(sheet_name, df):
     try:
         sheet = sh.worksheet(sheet_name)
@@ -185,7 +197,7 @@ def save_df(sheet_name, df):
             if col in df_save.columns:
                 df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
         sheet.update([df_save.columns.values.tolist()] + df_save.fillna("").values.tolist(), value_input_option='USER_ENTERED')
-        st.toast(f"Zaktualizowano chmurę: {sheet_name}!", icon="☁️")
+        st.toast(f"Zaktualizowano historię: {sheet_name}!", icon="☁️")
     except Exception as e:
         st.error(f"Błąd przy masowym zapisie: {e}")
 
@@ -217,7 +229,8 @@ def add_operation_modal():
                     "Kwota": float(k)
                 })
                 if sukces:
-                    st.session_state['operation_saved'] = True
+                    st.success("✅ Wysłano do bazy! Zaraz odświeżę...")
+                    time.sleep(1)
                     st.rerun()
 
     elif "Przelew" in akcja:
@@ -233,7 +246,10 @@ def add_operation_modal():
                     "Typ": "Konto",
                     "Kwota": float(kw)
                 })
-                if sukces: st.rerun()
+                if sukces:
+                    st.success("✅ Zaksięgowano! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
 
     elif "Konto oszczędnościowe" in akcja:
         cl = st.text_input("Cel oszczędzania:")
@@ -250,7 +266,10 @@ def add_operation_modal():
                     "Akcja": typ_osz, 
                     "Typ": typ_osz 
                 })
-                if sukces: st.rerun()
+                if sukces:
+                    st.success("✅ Sejf zaktualizowany! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
 c_m, c_y = st.columns(2)
