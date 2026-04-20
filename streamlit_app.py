@@ -47,9 +47,10 @@ st.markdown("""
     ul[role="listbox"] { background-color: #ffffff !important; }
     ul[role="listbox"] li { color: #000000 !important; font-weight: bold; } 
 
-    /* TABELA DANYCH */
-    [data-testid="stDataFrame"] { background-color: rgba(255, 255, 255, 0.95); border-radius: 8px; padding: 5px; }
-    [data-testid="stDataFrame"] span { color: #000000 !important; }
+    /* TABELA DANYCH (TUNING WIZUALNY) */
+    [data-testid="stDataFrame"] { background-color: rgba(255, 255, 255, 0.98); border-radius: 12px; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    [data-testid="stDataFrame"] span { color: #000000 !important; font-family: 'Roboto', sans-serif; font-weight: 500; }
+    div[data-testid="stDataFrameResizable"] { border: 2px solid #003366; border-radius: 10px; }
 
     /* NOWOCZESNA NAWIGACJA (TABS) */
     [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; }
@@ -63,7 +64,13 @@ st.markdown("""
         font-family: 'Bebas Neue', cursive; font-size: 2rem !important; letter-spacing: 2px; padding: 15px !important; box-shadow: 0 10px 20px rgba(200, 56, 3, 0.4); width: 100%; transition: transform 0.2s;
     }
     .stButton>button[kind="primary"]:active { transform: scale(0.95); }
-    .stButton>button[kind="secondary"] { background-color: #003366; color: white !important; border: 2px solid #ffb612; border-radius: 8px; font-family: 'Oswald', sans-serif; text-transform: uppercase; width: 100%; font-weight: bold; }
+    
+    /* Naprawa niewidocznego tekstu w przyciskach formualrzy */
+    .stButton>button[kind="secondary"], [data-testid="stFormSubmitButton"]>button { 
+        background-color: #003366 !important; color: white !important; border: 2px solid #ffb612 !important; border-radius: 8px; 
+        font-family: 'Oswald', sans-serif !important; text-transform: uppercase; width: 100%; font-weight: bold; 
+    }
+    [data-testid="stFormSubmitButton"]>button p { color: white !important; }
     [data-testid="stForm"] { background-color: rgba(255, 255, 255, 0.05); border: 2px solid #c83803; border-radius: 15px; padding: 20px; }
 
     /* KARTY Z WYNIKAMI (SCOREBOARDS) */
@@ -141,55 +148,16 @@ def init_connection():
 
 sh = init_connection()
 
-# ULEPSZONY SYSTEM ODCZYTU
 def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
         if not df.empty:
-            df.columns = df.columns.str.strip() # ZABÓJCA SPACJI W NAGŁÓWKACH
-            for col in df.columns:
-                if 'kwota' in col.lower() or 'koszt' in col.lower():
-                    # Zabezpieczenie przed polskimi przecinkami z arkuszy
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace(' ', ''), errors='coerce').fillna(0)
             for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors='coerce') 
         return df
-    except Exception: 
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
-# NUKLEARNY SYSTEM ZAPISU Z NAPRAWIONYM FORMATOWANIEM DATY
-def bezpieczny_zapis(sheet_name, dane_dict):
-    try:
-        # Wczytaj obecne dane
-        df = load_df(sheet_name)
-        
-        # Stwórz wiersz z nowymi danymi
-        nowy_wiersz = pd.DataFrame([dane_dict])
-        
-        # Połącz stare z nowym
-        if df.empty:
-            df_final = nowy_wiersz
-        else:
-            df_final = pd.concat([df, nowy_wiersz], ignore_index=True)
-            
-        # Zapisz całość od zera (to niszczy "niewidzialne" wiersze)
-        sheet = sh.worksheet(sheet_name)
-        sheet.clear()
-        
-        for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
-            if col in df_final.columns:
-                # FIX: Wymuszamy obiekt datetime przed próbą formatowania, żeby zabić błąd "str object has no attribute strftime"
-                df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
-                df_final[col] = df_final[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
-                
-        sheet.update([df_final.columns.values.tolist()] + df_final.fillna("").values.tolist(), value_input_option='USER_ENTERED')
-        return True
-    except Exception as e:
-        st.error(f"Krytyczny błąd zapisu: {e}")
-        return False
-
-# ZWYKŁY ZAPIS DLA TABEL (Edycja) Z NAPRAWIONYM FORMATOWANIEM DATY
 def save_df(sheet_name, df):
     try:
         sheet = sh.worksheet(sheet_name)
@@ -197,7 +165,6 @@ def save_df(sheet_name, df):
         df_save = df.copy()
         for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
             if col in df_save.columns:
-                # FIX W EDYCJI TEŻ: Wymuszamy obiekt datetime
                 df_save[col] = pd.to_datetime(df_save[col], errors='coerce')
                 df_save[col] = df_save[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
                 
@@ -222,59 +189,26 @@ def add_operation_modal():
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         
         if st.button("Zanotuj Wydatek", use_container_width=True):
-            if k <= 0:
-                st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
-            elif not n:
-                st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
-            else:
-                sukces = bezpieczny_zapis("Wydatki", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Nazwa": n,
-                    "Kategoria": "Codzienne",
-                    "Kwota": float(k)
-                })
-                if sukces:
-                    st.success("✅ Wysłano do bazy! Zaraz odświeżę...")
-                    time.sleep(1)
-                    st.rerun()
+            if k > 0 and n:
+                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), n, "Codzienne", k])
+                st.rerun()
 
     elif "Przelew" in akcja:
         z = st.text_input("Od kogo wpłynęło?")
         kw = st.number_input("Wpływ (zł)", min_value=0.0, step=1.0)
         if st.button("Zaksięguj Przelew", use_container_width=True):
-            if kw <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
-            elif not z: st.warning("⚠️ Wpisz źródło przelewu.")
-            else:
-                sukces = bezpieczny_zapis("Przychody", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Źródło": z,
-                    "Typ": "Konto",
-                    "Kwota": float(kw)
-                })
-                if sukces:
-                    st.success("✅ Zaksięgowano! Zaraz odświeżę...")
-                    time.sleep(1)
-                    st.rerun()
+            if z and kw > 0:
+                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
+                st.rerun()
 
     elif "Konto oszczędnościowe" in akcja:
         cl = st.text_input("Cel oszczędzania:")
         kwo = st.number_input("Podaj kwotę (zł)", min_value=0.0, step=1.0)
         typ_osz = st.selectbox("Typ", ["Wpłata", "Wypłata"])
         if st.button("Zatwierdź w oszczędnościach", use_container_width=True):
-            if kwo <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
-            elif not cl: st.warning("⚠️ Podaj cel.")
-            else:
-                sukces = bezpieczny_zapis("Oszczednosci", {
-                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Cel": cl,
-                    "Kwota": float(kwo),
-                    "Akcja": typ_osz, 
-                    "Typ": typ_osz 
-                })
-                if sukces:
-                    st.success("✅ Sejf zaktualizowany! Zaraz odświeżę...")
-                    time.sleep(1)
-                    st.rerun()
+            if cl and kwo > 0:
+                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cl, kwo, typ_osz])
+                st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
 c_m, c_y = st.columns(2)
@@ -339,21 +273,34 @@ with t1:
 
 with t2:
     st.markdown("<h3>📜 Historia Codziennych Wydatków</h3>", unsafe_allow_html=True)
+    st.info("💡 **Aby usunąć wydatek:** Zaznacz szary kwadracik po lewej stronie wiersza i kliknij ikonę kosza w prawym górnym rogu tabeli.")
     
     m_str = selected_date.strftime("%Y-%m")
     wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
     
     if not wyd_m.empty:
-        ed_w = st.data_editor(wyd_m.sort_values("Data", ascending=False), hide_index=True, use_container_width=True)
+        ed_w = st.data_editor(
+            wyd_m.sort_values("Data", ascending=False), 
+            hide_index=True, 
+            num_rows="dynamic", # TO POZWALA NA DODAWANIE/USUWANIE WIERSZY!
+            use_container_width=True,
+            column_config={
+                "Data": st.column_config.DatetimeColumn("Kiedy? 🕒", format="YYYY-MM-DD HH:mm"),
+                "Nazwa": st.column_config.TextColumn("Co kupiono? 🛒"),
+                "Kategoria": st.column_config.SelectboxColumn("Kategoria 📂", options=["Codzienne", "Dom i Rachunki", "Rozrywka", "Auto"]),
+                "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł")
+            }
+        )
         if st.button("💾 Zapisz korektę wydatków"): save_df("Wydatki", ed_w)
     else:
         st.info("Brak wydatków w tym miesiącu. Użyj przycisku DODAJ OPERACJĘ na górze.")
 
 with t3:
     st.markdown("<h3>🏢 Koszty Stałe (Zobowiązania)</h3>", unsafe_allow_html=True)
+    st.info("💡 **Aby usunąć rachunek:** Zaznacz szary kwadracik obok nazwy i kliknij ikonę kosza na górze tabeli.")
     
     with st.form("f_zob", clear_on_submit=True):
-        st.write("📝 Dodaj nowy stały wydatek")
+        st.write("📝 **Nowy Koszt Stały** (Np. Abonament, który pobiera się sam)")
         nz = st.text_input("Nazwa (np. Czynsz, Rata za auto)")
         
         c_k, c_t = st.columns(2)
@@ -368,19 +315,22 @@ with t3:
             if nz and kz > 0:
                 start_str = d_start.strftime("%Y-%m-%d %H:%M:%S")
                 end_str = d_end.strftime("%Y-%m-%d %H:%M:%S") if d_end else ""
-                bezpieczny_zapis("Zobowiazania", {
-                    "Nazwa": nz,
-                    "Typ": tz,
-                    "Kwota": kz,
-                    "Data rozpoczęcia": start_str,
-                    "Data zakończenia": end_str
-                })
+                sh.worksheet("Zobowiazania").append_row([nz, tz, kz, start_str, end_str])
                 st.rerun()
                 
     if not zob_all.empty:
         ed_z = st.data_editor(
-            zob_all, hide_index=True, num_rows="dynamic", use_container_width=True,
-            column_config={ "Data rozpoczęcia": st.column_config.DateColumn(format="YYYY-MM-DD"), "Data zakończenia": st.column_config.DateColumn(format="YYYY-MM-DD") }
+            zob_all, 
+            hide_index=True, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            column_config={ 
+                "Nazwa": st.column_config.TextColumn("Nazwa Rachunku 🧾"),
+                "Typ": st.column_config.SelectboxColumn("Typ", options=["Subskrypcja", "Koszt Stały", "Rata Kredytu"]),
+                "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł"),
+                "Data rozpoczęcia": st.column_config.DateColumn("Start 🟢", format="YYYY-MM-DD"), 
+                "Data zakończenia": st.column_config.DateColumn("Koniec 🔴", format="YYYY-MM-DD") 
+            }
         )
         if st.button("💾 Zapisz zmiany w kosztach stałych"): save_df("Zobowiazania", ed_z)
 
@@ -389,7 +339,18 @@ with t4:
     st.write("Aby dodać lub wypłacić środki, użyj pomarańczowego przycisku DODAJ OPERACJĘ na górze.")
     
     if not osz_all.empty:
-        ed_o = st.data_editor(osz_all.sort_values("Data", ascending=False), hide_index=True, num_rows="dynamic", use_container_width=True)
+        ed_o = st.data_editor(
+            osz_all.sort_values("Data", ascending=False), 
+            hide_index=True, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            column_config={
+                "Data": st.column_config.DatetimeColumn("Kiedy?", format="YYYY-MM-DD HH:mm"),
+                "Cel": st.column_config.TextColumn("Cel 🎯"),
+                "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł"),
+                "Akcja": st.column_config.SelectboxColumn("Operacja", options=["Wpłata", "Wypłata"])
+            }
+        )
         if st.button("💾 Zapisz korekty w oszczędnościach"): save_df("Oszczednosci", ed_o)
     else:
         st.info("Brak środków na koncie oszczędnościowym.")
