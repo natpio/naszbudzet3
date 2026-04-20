@@ -54,7 +54,7 @@ st.markdown("""
 
     /* NOWOCZESNA NAWIGACJA (TABS) */
     [data-testid="stTabs"] [data-baseweb="tab-list"] { background-color: #003366 !important; border-radius: 12px; padding: 5px; gap: 5px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
-    [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 0.95rem; border-radius: 8px; padding: 8px 12px; border: none; background: transparent; }
+    [data-testid="stTabs"] [data-baseweb="tab"] { color: #e2e8f0 !important; font-family: 'Oswald', sans-serif !important; font-size: 0.85rem; border-radius: 8px; padding: 8px 10px; border: none; background: transparent; }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] { background-color: #c83803 !important; color: white !important; font-weight: bold; box-shadow: 0 4px 10px rgba(200, 56, 3, 0.5); }
     [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] div[data-testid="stMarkdownContainer"] p { color: white !important; text-shadow: none; }
 
@@ -88,7 +88,7 @@ st.markdown("""
     /* MOBILE RWD */
     @media (max-width: 768px) {
         .block-container, [data-testid="block-container"] { padding: 15px !important; border-width: 2px !important; margin-top: 0 !important; }
-        [data-testid="stTabs"] [data-baseweb="tab"] { font-size: 0.65rem !important; padding: 8px 3px !important; }
+        [data-testid="stTabs"] [data-baseweb="tab"] { font-size: 0.60rem !important; padding: 6px 4px !important; }
         .hero-card h2, .hero-card.interstate h2 { font-size: 2.2rem !important; }
         .stButton>button[kind="primary"] { font-size: 1.5rem !important; padding: 10px !important;}
     }
@@ -202,6 +202,9 @@ wyd_all = load_df("Wydatki")
 zob_all = load_df("Zobowiazania")
 osz_all = load_df("Oszczednosci")
 
+# KATEGORIE WYDATKÓW
+KATEGORIE = ["Jedzenie", "Dom", "Transport", "Rozrywka", "Inne"]
+
 # --- WYSKAKUJĄCE OKNO (SMART MODAL) ---
 @st.dialog("CO ROBIMY? 🏈")
 def add_operation_modal():
@@ -210,13 +213,14 @@ def add_operation_modal():
     
     if "Wydatek" in akcja:
         n = st.text_input("Na co wydałeś?")
+        kat = st.selectbox("Kategoria", KATEGORIE)
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         
         if st.button("Zanotuj Wydatek", use_container_width=True):
             if k <= 0: st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
             elif not n: st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
             else:
-                if bezpieczny_zapis("Wydatki", {"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nazwa": n, "Kategoria": "Codzienne", "Kwota": float(k)}):
+                if bezpieczny_zapis("Wydatki", {"Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Nazwa": n, "Kategoria": kat, "Kwota": float(k)}):
                     st.success("✅ Wysłano do bazy! Zaraz odświeżę...")
                     time.sleep(1)
                     st.rerun()
@@ -262,8 +266,8 @@ if st.button("➕ DODAJ OPERACJĘ", type="primary"):
 
 st.write("") 
 
-# --- PIĘĆ ZAKŁADEK ---
-t1, t2, t3, t4, t5 = st.tabs(["🏠 KOKPIT", "📜 WYDATKI", "📥 WPŁYWY", "🏢 KOSZTY STAŁE", "🏦 SEJF"])
+# --- SZEŚĆ ZAKŁADEK ---
+t1, t2, t3, t4, t5, t6 = st.tabs(["🏠 KOKPIT", "📜 WYDATKI", "📥 WPŁYWY", "🏢 STAŁE", "🏦 SEJF", "📊 STATYSTYKI"])
 
 with t1:
     m_str = selected_date.strftime("%Y-%m")
@@ -322,7 +326,7 @@ with t2:
             column_config={
                 "Data": st.column_config.DatetimeColumn("Kiedy? 🕒", format="YYYY-MM-DD HH:mm"),
                 "Nazwa": st.column_config.TextColumn("Co kupiono? 🛒"),
-                "Kategoria": st.column_config.SelectboxColumn("Kategoria 📂", options=["Codzienne", "Dom i Rachunki", "Rozrywka", "Auto"]),
+                "Kategoria": st.column_config.SelectboxColumn("Kategoria 📂", options=KATEGORIE),
                 "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł")
             }
         )
@@ -330,10 +334,8 @@ with t2:
     else:
         st.info("Brak wydatków w tym miesiącu.")
 
-# --- NOWA ZAKŁADKA WPŁYWY (PRZYCHODY) ---
 with t3:
     st.markdown("<h3>📥 Historia Wpływów</h3>", unsafe_allow_html=True)
-    st.info("💡 **Aby usunąć wpływ:** Zaznacz szary kwadracik po lewej stronie wiersza i kliknij ikonę kosza.")
     
     m_str = selected_date.strftime("%Y-%m")
     prz_m = prz_all[prz_all['Data'].dt.strftime("%Y-%m") == m_str] if not prz_all.empty else pd.DataFrame()
@@ -355,10 +357,9 @@ with t3:
 
 with t4:
     st.markdown("<h3>🏢 Koszty Stałe (Zobowiązania)</h3>", unsafe_allow_html=True)
-    st.info("💡 **Aby usunąć rachunek:** Zaznacz szary kwadracik obok nazwy i kliknij ikonę kosza.")
     
     with st.form("f_zob", clear_on_submit=True):
-        st.write("📝 **Nowy Koszt Stały** (Np. Abonament, który pobiera się sam)")
+        st.write("📝 **Nowy Koszt Stały**")
         nz = st.text_input("Nazwa (np. Czynsz, Rata za auto)")
         
         c_k, c_t = st.columns(2)
@@ -391,7 +392,6 @@ with t4:
 
 with t5:
     st.markdown("<h3>🏦 Konto Oszczędnościowe</h3>", unsafe_allow_html=True)
-    st.write("Aby dodać lub wypłacić środki, użyj pomarańczowego przycisku DODAJ OPERACJĘ na górze.")
     
     if not osz_all.empty:
         ed_o = st.data_editor(
@@ -407,3 +407,33 @@ with t5:
         if st.button("💾 Zapisz korekty w oszczędnościach"): save_df("Oszczednosci", ed_o)
     else:
         st.info("Brak środków na koncie oszczędnościowym.")
+
+# --- NOWA ZAKŁADKA STATYSTYKI ---
+with t6:
+    st.markdown("<h3>📊 Podsumowanie Kategorii</h3>", unsafe_allow_html=True)
+    
+    m_str = selected_date.strftime("%Y-%m")
+    wyd_m = wyd_all[wyd_all['Data'].dt.strftime("%Y-%m") == m_str] if not wyd_all.empty else pd.DataFrame()
+    
+    if not wyd_m.empty and "Kategoria" in wyd_m.columns:
+        st.write(f"Struktura Twoich wydatków za **{wybrany_m_nazwa} {wybrany_rok}**:")
+        
+        # Agregacja wydatków po kategorii
+        suma_kat = wyd_m.groupby("Kategoria")["Kwota"].sum().reset_index()
+        suma_kat = suma_kat.sort_values(by="Kwota", ascending=False)
+        
+        # Wykres słupkowy z pomarańczowym kolorem
+        st.bar_chart(suma_kat.set_index("Kategoria"), color="#ffb612")
+        
+        # Tabela z precyzyjnymi danymi
+        st.dataframe(
+            suma_kat, 
+            hide_index=True, 
+            use_container_width=True,
+            column_config={
+                "Kategoria": st.column_config.TextColumn("Kategoria 📂"),
+                "Kwota": st.column_config.NumberColumn("Suma wydatków", format="%.2f zł")
+            }
+        )
+    else:
+        st.info("Brak wydatków w tym miesiącu do wygenerowania statystyk.")
