@@ -152,11 +152,40 @@ def load_df(sheet_name):
     try:
         df = pd.DataFrame(sh.worksheet(sheet_name).get_all_records())
         if not df.empty:
+            df.columns = df.columns.str.strip()
+            for col in df.columns:
+                if 'kwota' in col.lower() or 'koszt' in col.lower():
+                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.').str.replace(' ', ''), errors='coerce').fillna(0)
             for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
                 if col in df.columns:
                     df[col] = pd.to_datetime(df[col], errors='coerce') 
         return df
-    except: return pd.DataFrame()
+    except Exception: 
+        return pd.DataFrame()
+
+def bezpieczny_zapis(sheet_name, dane_dict):
+    try:
+        df = load_df(sheet_name)
+        nowy_wiersz = pd.DataFrame([dane_dict])
+        
+        if df.empty:
+            df_final = nowy_wiersz
+        else:
+            df_final = pd.concat([df, nowy_wiersz], ignore_index=True)
+            
+        sheet = sh.worksheet(sheet_name)
+        sheet.clear()
+        
+        for col in ['Data', 'Data rozpoczęcia', 'Data zakończenia']:
+            if col in df_final.columns:
+                df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
+                df_final[col] = df_final[col].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+                
+        sheet.update([df_final.columns.values.tolist()] + df_final.fillna("").values.tolist(), value_input_option='USER_ENTERED')
+        return True
+    except Exception as e:
+        st.error(f"Krytyczny błąd zapisu: {e}")
+        return False
 
 def save_df(sheet_name, df):
     try:
@@ -189,26 +218,59 @@ def add_operation_modal():
         k = st.number_input("Koszt (zł)", min_value=0.0, step=1.0)
         
         if st.button("Zanotuj Wydatek", use_container_width=True):
-            if k > 0 and n:
-                sh.worksheet("Wydatki").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), n, "Codzienne", k])
-                st.rerun()
+            if k <= 0:
+                st.warning("⚠️ Ej! Kwota musi być większa niż zero.")
+            elif not n:
+                st.warning("⚠️ Wpisz nazwę wydatku (np. 'Kawa').")
+            else:
+                sukces = bezpieczny_zapis("Wydatki", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Nazwa": n,
+                    "Kategoria": "Codzienne",
+                    "Kwota": float(k)
+                })
+                if sukces:
+                    st.success("✅ Wysłano do bazy! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
 
     elif "Przelew" in akcja:
         z = st.text_input("Od kogo wpłynęło?")
         kw = st.number_input("Wpływ (zł)", min_value=0.0, step=1.0)
         if st.button("Zaksięguj Przelew", use_container_width=True):
-            if z and kw > 0:
-                sh.worksheet("Przychody").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), z, "Konto", kw])
-                st.rerun()
+            if kw <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
+            elif not z: st.warning("⚠️ Wpisz źródło przelewu.")
+            else:
+                sukces = bezpieczny_zapis("Przychody", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Źródło": z,
+                    "Typ": "Konto",
+                    "Kwota": float(kw)
+                })
+                if sukces:
+                    st.success("✅ Zaksięgowano! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
 
     elif "Konto oszczędnościowe" in akcja:
         cl = st.text_input("Cel oszczędzania:")
         kwo = st.number_input("Podaj kwotę (zł)", min_value=0.0, step=1.0)
         typ_osz = st.selectbox("Typ", ["Wpłata", "Wypłata"])
         if st.button("Zatwierdź w oszczędnościach", use_container_width=True):
-            if cl and kwo > 0:
-                sh.worksheet("Oszczednosci").append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cl, kwo, typ_osz])
-                st.rerun()
+            if kwo <= 0: st.warning("⚠️ Wpisz kwotę większą niż zero.")
+            elif not cl: st.warning("⚠️ Podaj cel.")
+            else:
+                sukces = bezpieczny_zapis("Oszczednosci", {
+                    "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Cel": cl,
+                    "Kwota": float(kwo),
+                    "Akcja": typ_osz, 
+                    "Typ": typ_osz 
+                })
+                if sukces:
+                    st.success("✅ Sejf zaktualizowany! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
 
 # --- GŁÓWNY INTERFEJS ---
 c_m, c_y = st.columns(2)
@@ -282,7 +344,7 @@ with t2:
         ed_w = st.data_editor(
             wyd_m.sort_values("Data", ascending=False), 
             hide_index=True, 
-            num_rows="dynamic", # TO POZWALA NA DODAWANIE/USUWANIE WIERSZY!
+            num_rows="dynamic", 
             use_container_width=True,
             column_config={
                 "Data": st.column_config.DatetimeColumn("Kiedy? 🕒", format="YYYY-MM-DD HH:mm"),
@@ -348,7 +410,8 @@ with t4:
                 "Data": st.column_config.DatetimeColumn("Kiedy?", format="YYYY-MM-DD HH:mm"),
                 "Cel": st.column_config.TextColumn("Cel 🎯"),
                 "Kwota": st.column_config.NumberColumn("Kwota", format="%.2f zł"),
-                "Akcja": st.column_config.SelectboxColumn("Operacja", options=["Wpłata", "Wypłata"])
+                "Akcja": st.column_config.SelectboxColumn("Operacja", options=["Wpłata", "Wypłata"]),
+                "Typ": None # Ukrywamy techniczną kolumnę z widoku, żeby nie było śmietnika
             }
         )
         if st.button("💾 Zapisz korekty w oszczędnościach"): save_df("Oszczednosci", ed_o)
