@@ -403,8 +403,20 @@ with t4:
             if nz and kz > 0:
                 start_str = d_start.strftime("%Y-%m-%d %H:%M:%S")
                 end_str = d_end.strftime("%Y-%m-%d %H:%M:%S") if d_end else ""
-                sh.worksheet("Zobowiazania").append_row([nz, tz, kz, start_str, end_str])
-                st.rerun()
+                
+                # Używamy ulepszonej funkcji bezpieczny_zapis
+                nowe_zobowiazanie = {
+                    "Nazwa": nz,
+                    "Typ": tz,
+                    "Kwota": float(kz),
+                    "Data rozpoczęcia": start_str,
+                    "Data zakończenia": end_str
+                }
+                
+                if bezpieczny_zapis("Zobowiazania", nowe_zobowiazanie):
+                    st.success("✅ Dodano koszt stały! Zaraz odświeżę...")
+                    time.sleep(1)
+                    st.rerun()
                 
     if not zob_all.empty:
         ed_z = st.data_editor(
